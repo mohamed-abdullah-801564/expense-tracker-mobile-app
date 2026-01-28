@@ -223,27 +223,6 @@ export default function FriendsScreen() {
         );
     }
 
-    if (friendSummaries.length === 0) {
-        return (
-            <ScrollView style={styles.container}>
-                <View style={styles.emptyContainer}>
-                    <Users size={64} color={colors.textSecondary} />
-                    <Text style={styles.emptyTitle}>No Split Expenses Yet</Text>
-                    <Text style={styles.emptyDescription}>
-                        When you add expenses with &quot;split&quot; in the description,
-                        {'\n'}they&apos;ll appear here for tracking.
-                    </Text>
-                    <View style={styles.exampleBox}>
-                        <Text style={styles.exampleTitle}>Example:</Text>
-                        <Text style={styles.exampleText}>• &quot;Lunch 400 split 4 person&quot;</Text>
-                        <Text style={styles.exampleText}>• &quot;Dinner 600 split 3&quot;</Text>
-                        <Text style={styles.exampleText}>• &quot;Movie 300 split 2&quot;</Text>
-                    </View>
-                </View>
-            </ScrollView>
-        );
-    }
-
     const totalPending = friendSummaries.reduce((sum, f) => sum + f.pendingAmount, 0);
     const totalPaid = friendSummaries.reduce((sum, f) => sum + f.totalPaid, 0);
     const totalNetBalance = friendSummaries.reduce((sum, f) => sum + f.netBalance, 0);
@@ -267,38 +246,59 @@ export default function FriendsScreen() {
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                    <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Net Balance</Text>
-                        <Text style={[
-                            styles.summaryValue,
-                            { color: totalNetBalance >= 0 ? colors.success : colors.error }
-                        ]}>
-                            {totalNetBalance >= 0 ? '+' : ''}₹{totalNetBalance.toFixed(2)}
+            {friendSummaries.length === 0 ? (
+                <ScrollView style={styles.container}>
+                    <View style={styles.emptyContainer}>
+                        <Users size={64} color={colors.textSecondary} />
+                        <Text style={styles.emptyTitle}>No Split Expenses Yet</Text>
+                        <Text style={styles.emptyDescription}>
+                            When you add expenses with &quot;split&quot; in the description,
+                            {'\n'}they&apos;ll appear here for tracking.
                         </Text>
+                        <View style={styles.exampleBox}>
+                            <Text style={styles.exampleTitle}>Example:</Text>
+                            <Text style={styles.exampleText}>• &quot;Lunch 400 split 4 person&quot;</Text>
+                            <Text style={styles.exampleText}>• &quot;Dinner 600 split 3&quot;</Text>
+                            <Text style={styles.exampleText}>• &quot;Movie 300 split 2&quot;</Text>
+                        </View>
                     </View>
-                    <View style={styles.summaryDivider} />
-                    <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total Paid</Text>
-                        <Text style={[styles.summaryValue, styles.paidAmount]}>
-                            ₹{totalPaid.toFixed(2)}
-                        </Text>
+                </ScrollView>
+            ) : (
+                <>
+                    <View style={styles.summaryCard}>
+                        <View style={styles.summaryRow}>
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryLabel}>Net Balance</Text>
+                                <Text style={[
+                                    styles.summaryValue,
+                                    { color: totalNetBalance >= 0 ? colors.success : colors.error }
+                                ]}>
+                                    {totalNetBalance >= 0 ? '+' : ''}₹{totalNetBalance.toFixed(2)}
+                                </Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryLabel}>Total Paid</Text>
+                                <Text style={[styles.summaryValue, styles.paidAmount]}>
+                                    ₹{totalPaid.toFixed(2)}
+                                </Text>
+                            </View>
+                        </View>
                     </View>
-                </View>
-            </View>
 
-            <FlatList
-                data={friendSummaries}
-                keyExtractor={(item) => item.friendName}
-                renderItem={renderFriendCard}
-                contentContainerStyle={styles.listContent}
-                initialNumToRender={8}
-                maxToRenderPerBatch={8}
-                windowSize={8}
-                removeClippedSubviews={true}
-                updateCellsBatchingPeriod={50}
-            />
+                    <FlatList
+                        data={friendSummaries}
+                        keyExtractor={(item) => item.friendName}
+                        renderItem={renderFriendCard}
+                        contentContainerStyle={styles.listContent}
+                        initialNumToRender={8}
+                        maxToRenderPerBatch={8}
+                        windowSize={8}
+                        removeClippedSubviews={true}
+                        updateCellsBatchingPeriod={50}
+                    />
+                </>
+            )}
 
             {editingSplit && (
                 <EditFriendNameModal

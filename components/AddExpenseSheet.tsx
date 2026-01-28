@@ -171,7 +171,9 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                                 'Lunch ₹150 at 1 PM',
                                 'Dinner 400 split 4 with John, Sarah, Mike',
                                 'Movie 300 split 2 with Alex',
-                                'Coffee ₹50 morning'
+                                'Coffee ₹50 morning',
+                                'Borrowed 500 from Ram',
+                                'Lent 200 to Sam'
                             ].map((example, index) => (
                                 <TouchableOpacity
                                     key={index}

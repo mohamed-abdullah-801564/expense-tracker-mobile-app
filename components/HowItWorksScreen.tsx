@@ -6,6 +6,7 @@ import {
     ScrollView,
     SafeAreaView,
     TouchableOpacity,
+    Platform,
 } from 'react-native';
 import {
     Wallet,
@@ -222,6 +223,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     header: {
         paddingHorizontal: 20,
         paddingVertical: 24,
+        paddingTop: Platform.OS === 'android' ? 40 : 20,
         backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
