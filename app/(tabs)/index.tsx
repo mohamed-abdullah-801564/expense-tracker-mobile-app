@@ -1,98 +1,218 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { Plus } from 'lucide-react-native';
+import { useExpenses } from '@/hooks/expense-store';
+import { useTheme } from '@/hooks/theme-store';
+import { useFirstTime } from '@/hooks/first-time-store';
+import { ExpenseCard } from '@/components/ExpenseCard';
+import CategoryFilter from '@/components/CategoryFilter';
+import { AddExpenseSheet } from '@/components/AddExpenseSheet';
+import BudgetCard from '@/components/BudgetCard';
+import SetBudgetSheet from '@/components/SetBudgetSheet';
+import HowItWorksScreen from '@/components/HowItWorksScreen';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function ExpensesScreen() {
+  const { expenses, stats, isLoading } = useExpenses();
+  const { colors } = useTheme();
+  const { isFirstTime, markGuideAsSeen, isLoading: isLoadingFirstTime } = useFirstTime();
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showBudgetSheet, setShowBudgetSheet] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
-export default function HomeScreen() {
+  const styles = createStyles(colors);
+
+  useEffect(() => {
+    if (!isLoadingFirstTime && isFirstTime) {
+      const timer = setTimeout(() => {
+        setShowGuide(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isFirstTime, isLoadingFirstTime]);
+
+  const handleCloseGuide = () => {
+    setShowGuide(false);
+    markGuideAsSeen();
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading your expenses...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.totalLabel}>Total Expenses</Text>
+          <Text style={styles.totalAmount}>₹{stats.total.toFixed(2)}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowAddSheet(true)}
+        >
+          <Plus size={24} color="white" />
+        </TouchableOpacity>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.content}>
+        <BudgetCard onSetBudget={() => setShowBudgetSheet(true)} />
+        <CategoryFilter />
+      </View>
+
+      <FlatList
+        data={expenses}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <ExpenseCard expense={item} />}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No expenses yet</Text>
+            <Text style={styles.emptySubtext}>
+              Tap the + button to add your first expense
+            </Text>
+          </View>
+        }
+      />
+
+      <AddExpenseSheet
+        visible={showAddSheet}
+        onClose={() => setShowAddSheet(false)}
+      />
+
+      <SetBudgetSheet
+        isVisible={showBudgetSheet}
+        onClose={() => setShowBudgetSheet(false)}
+      />
+
+      <Modal
+        visible={showGuide}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseGuide}
+      >
+        <View style={styles.guideModalContainer}>
+          <View style={styles.guideModalHeader}>
+            <Text style={styles.guideModalTitle}>Welcome to Expense Tracker!</Text>
+            <TouchableOpacity onPress={handleCloseGuide}>
+              <Text style={styles.closeButton}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          <HowItWorksScreen
+            onGetStarted={handleCloseGuide}
+            showGetStartedButton={true}
+          />
+        </View>
+      </Modal>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  stepContainer: {
-    gap: 8,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  totalLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  totalAmount: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  addButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  listContent: {
+    paddingVertical: 8,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  emptySubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  guideModalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  guideModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  guideModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  closeButton: {
+    fontSize: 16,
+    color: colors.primary,
   },
 });
