@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
-import { Target, AlertTriangle, CheckCircle, Clock, History } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+import { Target, AlertTriangle, CheckCircle, Clock } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
-import { BudgetHistory } from '@/components/BudgetHistory';
 
 interface BudgetCardProps {
     onSetBudget: () => void;
 }
 
 export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
-    const { budgetProgress, clearBudget, budgetHistory } = useExpenses();
+    const { budgetProgress, clearBudget } = useExpenses();
     const { colors } = useTheme();
-    const [showHistory, setShowHistory] = useState(false);
     const styles = createStyles(colors);
 
     if (!budgetProgress) {
@@ -55,6 +53,24 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             return colors.error;
         }
         return colors.success;
+    };
+
+    const handleClearBudget = () => {
+        Alert.alert(
+            "Clear Budget",
+            "Are you sure you want to delete the current budget?",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Clear",
+                    style: "destructive",
+                    onPress: clearBudget
+                }
+            ]
+        );
     };
 
     return (
@@ -123,25 +139,10 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
                 <TouchableOpacity style={styles.updateButton} onPress={onSetBudget}>
                     <Text style={styles.updateButtonText}>Update Budget</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.historyButton} onPress={() => setShowHistory(true)}>
-                    <History size={16} color={colors.primary} />
-                    <Text style={styles.historyButtonText}>History</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.clearButton} onPress={clearBudget}>
+                <TouchableOpacity style={styles.clearButton} onPress={handleClearBudget}>
                     <Text style={styles.clearButtonText}>Clear</Text>
                 </TouchableOpacity>
             </View>
-
-            <Modal
-                visible={showHistory}
-                animationType="slide"
-                presentationStyle="pageSheet"
-            >
-                <BudgetHistory
-                    transactions={budgetHistory}
-                    onClose={() => setShowHistory(false)}
-                />
-            </Modal>
         </View>
     );
 }
@@ -259,22 +260,6 @@ const createStyles = (colors: any) => StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         alignItems: 'center',
-    },
-    historyButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '20',
-    },
-    historyButtonText: {
-        color: colors.primary,
-        fontSize: 12,
-        fontWeight: '600',
     },
     updateButtonText: {
         color: '#fff',

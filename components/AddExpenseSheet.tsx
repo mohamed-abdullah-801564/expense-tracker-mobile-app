@@ -17,7 +17,8 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { parseExpenseWithAI, validateAmount } from '@/utils/expense-parser';
-import { parseSplitExpense, createSplitExpenses } from '@/utils/split-expense-parser';
+import { parseSplitExpense, createSplitExpenses, parseDebt } from '@/utils/split-expense-parser';
+import { SplitExpense } from '@/types/expense';
 
 
 interface AddExpenseSheetProps {
@@ -35,6 +36,40 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
     const handleSubmit = async () => {
         if (!input.trim()) {
             Alert.alert('Error', 'Please enter an expense description');
+            return;
+        }
+
+        // Check for Debt (Lend/Borrow)
+        const debtData = parseDebt(input);
+        if (debtData) {
+            const expenseDate = new Date().toISOString();
+            const expenseId = Date.now().toString();
+
+            const newSplit: SplitExpense = {
+                id: `${expenseId}_${debtData.type}`,
+                expenseId,
+                friendName: debtData.friendName,
+                amount: debtData.amount,
+                description: debtData.description,
+                category: 'Other',
+                date: expenseDate,
+                isPaid: false,
+                createdAt: expenseDate,
+                type: debtData.type,
+            };
+
+            addSplitExpenses([newSplit]);
+
+            if (debtData.type === 'lend') {
+                // Lending is NOT added to expenses, only Friends tab
+                Alert.alert("Lending Recorded", "Tracked in Friends tab.");
+            } else {
+                // Borrowing
+                Alert.alert("Borrowing Recorded", "Tracked in Friends tab.");
+            }
+
+            setInput('');
+            onClose();
             return;
         }
 

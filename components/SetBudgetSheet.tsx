@@ -37,12 +37,36 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                 return;
             }
 
-            setPendingBudget({ amount: parsed.budget_amount, days: parsed.budget_days });
+            // Determine if this is strictly an add operation (intent + existing budget)
+            const isAddOperation = (parsed.is_add_operation ?? false) && !!budgetProgress?.budget;
 
-            if (allExpenses.length > 0) {
+            // Strict Duration Check
+            // If NOT an add operation, we MUST have a duration
+            if (!isAddOperation && parsed.budget_days === null) {
+                Alert.alert(
+                    'Duration Missing',
+                    "Please specify the duration (e.g., '500 for 10 days' or '1000 for 1 month')."
+                );
+                setIsLoading(false);
+                return;
+            }
+
+            // If it is an add operation, default days to current budget days if null (logic handled in store usually, but parser returns null here)
+            // Actually store expects a number, so lets pass current days if null
+            const daysToPass = parsed.budget_days ?? (budgetProgress?.budget.days || 7);
+
+            setPendingBudget({ amount: parsed.budget_amount, days: daysToPass });
+
+            if (isAddOperation) {
+                // If adding to existing budget, skip deduction choice and just add
+                setBudgetData(parsed.budget_amount, daysToPass, 'add', false);
+                setInput('');
+                onClose();
+                Alert.alert('Success', `Budget updated: Added ₹${parsed.budget_amount} to current pool.`);
+            } else if (allExpenses.length > 0) {
                 setShowDeductionChoice(true);
             } else {
-                setBudgetData(parsed.budget_amount, parsed.budget_days, 'replace', false);
+                setBudgetData(parsed.budget_amount, daysToPass, 'replace', false);
                 setInput('');
                 onClose();
                 Alert.alert('Success', `Budget set successfully!`);

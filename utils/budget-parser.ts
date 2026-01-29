@@ -6,24 +6,29 @@ export async function parseBudgetWithAI(input: string): Promise<ParsedBudget> {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
-        const systemPrompt = `You are an AI assistant that helps users set their budget and duration for expense tracking. When given a natural language input, your task is to extract:
+        const systemPrompt = `You are an AI assistant that helps users set or update their budget for expense tracking. When given a natural language input, your task is to extract:
 
 1. The total budget amount as a number.
-2. The budget duration in days as a number (convert weeks to days when mentioned).
+2. The budget duration in days as a number (convert weeks/months to days). If NO duration is mentioned, set this to null.
+3. Whether the user wants to ADD to an existing budget (e.g., "Add 500", "Increase by 1000", "Top up 200").
 
 Return the result in JSON format with keys:
 - budget_amount (number)
-- budget_days (number)
+- budget_days (number or null)
+- is_add_operation (boolean)
 
 Examples:
 Input: 'I want to set a budget of 4000 rupees for 1 week'
-Output: { "budget_amount": 4000, "budget_days": 7 }
+Output: { "budget_amount": 4000, "budget_days": 7, "is_add_operation": false }
 
-Input: 'Budget 4500 for 2 weeks'
-Output: { "budget_amount": 4500, "budget_days": 14 }
+Input: 'Add 1000 to my budget'
+Output: { "budget_amount": 1000, "budget_days": null, "is_add_operation": true }
 
-Input: 'My budget is 5000 for 15 days'
-Output: { "budget_amount": 5000, "budget_days": 15 }`;
+Input: 'Budget 5000' (Invalid duration)
+Output: { "budget_amount": 5000, "budget_days": null, "is_add_operation": false }
+
+Input: 'Increase budget by 500'
+Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`;
 
         const response = await fetch('https://toolkit.rork.com/text/llm/', {
             method: 'POST',
@@ -75,7 +80,8 @@ Output: { "budget_amount": 5000, "budget_days": 15 }`;
 
         return {
             budget_amount: parsed.budget_amount,
-            budget_days: parsed.budget_days
+            budget_days: parsed.budget_days,
+            is_add_operation: parsed.is_add_operation
         };
     } catch (error: any) {
         clearTimeout(timeoutId);
@@ -93,10 +99,14 @@ function fallbackBudgetParser(input: string): ParsedBudget {
     // Extract amount using regex
     const amountMatch = input.match(/₹?(\d+(?:\.\d+)?)/);
     const budget_amount = amountMatch ? parseFloat(amountMatch[1]) : 1000;
-
-    // Extract days/weeks using regex
     const lowerInput = input.toLowerCase();
-    let budget_days = 7; // default to 1 week
+
+    // Detect add/increase intent
+    const is_add_operation = lowerInput.includes('add') ||
+        lowerInput.includes('increase') ||
+        lowerInput.includes('top up');
+
+    let budget_days: number | null = null;
 
     // Look for specific day numbers
     const dayMatch = input.match(/(\d+)\s*days?/i);
@@ -114,7 +124,10 @@ function fallbackBudgetParser(input: string): ParsedBudget {
         }
     }
 
-    return { budget_amount, budget_days };
+    // Default only if not adding and no duration found - actually, let's keep it null for strict checking
+    // But for backward compatibility in logic, we return null if not found.
+
+    return { budget_amount, budget_days, is_add_operation };
 }
 
 export function calculateBudgetStats(input: BudgetCalculationInput): BudgetCalculationResult {

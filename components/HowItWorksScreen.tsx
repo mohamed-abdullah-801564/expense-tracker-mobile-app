@@ -52,8 +52,8 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
             steps: [
                 'Go to the Expenses tab',
                 'Tap "Set Budget" button',
-                'Enter budget amount and duration',
-                'Choose to keep or deduct existing expenses',
+                'Enter budget amount and duration (e.g. "5000 for 10 days")',
+                'Type "Add 2000" to top up existing budget without resetting dates',
                 'Your budget will track spending automatically',
             ],
         },
@@ -65,8 +65,8 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
                 'Tap the + button on the Expenses tab',
                 'Type your expense naturally (e.g., "Lunch 450 food")',
                 'Or split bills: "Dinner 800 split 4 person"',
-                'Enter names for split expenses if needed',
-                'Expense is saved and budget updates automatically',
+                'Track debts: "Lend 500 to Ram" or "Borrow 200 from Sam"',
+                'These debt transactions appear in Friends tab, not Total Expenses',
             ],
         },
         {

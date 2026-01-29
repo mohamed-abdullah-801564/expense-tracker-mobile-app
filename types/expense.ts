@@ -9,6 +9,7 @@ export interface Expense {
     paid_to?: string;
     note?: string;
     createdAt: string;
+    isDeleted?: boolean;
 }
 
 export type ExpenseCategory =
@@ -48,7 +49,8 @@ export interface Budget {
 
 export interface ParsedBudget {
     budget_amount: number;
-    budget_days: number;
+    budget_days: number | null;
+    is_add_operation?: boolean;
 }
 
 export interface BudgetCalculationInput {

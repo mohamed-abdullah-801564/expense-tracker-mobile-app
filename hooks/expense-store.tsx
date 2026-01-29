@@ -269,7 +269,9 @@ function useCreateExpenseContext() {
     }, [expenses, saveExpenses]);
 
     const deleteExpense = useCallback((id: string) => {
-        const updated = expenses.filter(e => e.id !== id);
+        const updated = expenses.map(e =>
+            e.id === id ? { ...e, isDeleted: true } : e
+        );
         setExpenses(updated);
         saveExpenses(updated);
     }, [expenses, saveExpenses]);
@@ -280,14 +282,17 @@ function useCreateExpenseContext() {
     }, [saveExpenses]);
 
     const setBudgetData = useCallback((budgetAmount: number, budgetDays: number, type: 'add' | 'replace' = 'replace', deductExistingExpenses: boolean = false) => {
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setDate(startDate.getDate() + budgetDays);
-
         let finalAmount = budgetAmount;
         let description = '';
+        let startDate = new Date();
+        let endDate = new Date();
+        endDate.setDate(startDate.getDate() + budgetDays);
 
         if (type === 'add' && budget) {
+            // Keep existing dates
+            startDate = new Date(budget.startDate);
+            endDate = new Date(budget.endDate);
+
             finalAmount = budget.amount + budgetAmount;
             description = `Added ₹${budgetAmount} to existing budget of ₹${budget.amount}`;
         } else {
@@ -295,7 +300,7 @@ function useCreateExpenseContext() {
         }
 
         if (deductExistingExpenses) {
-            const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const totalExpenses = expenses.filter(e => !e.isDeleted).reduce((sum, exp) => sum + exp.amount, 0);
             finalAmount = Math.max(0, finalAmount - totalExpenses);
             description += ` (deducted ₹${totalExpenses} existing expenses)`;
         }
@@ -303,7 +308,7 @@ function useCreateExpenseContext() {
         const newBudget: Budget = {
             id: Date.now().toString(),
             amount: finalAmount,
-            days: budgetDays,
+            days: type === 'add' && budget ? budget.days : budgetDays, // Keep existing days if adding, though technically days arg might be ignored primarily for dates
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
             createdAt: new Date().toISOString(),
@@ -363,6 +368,8 @@ function useCreateExpenseContext() {
         let grandTotal = 0;
 
         expenses.forEach(expense => {
+            if (expense.isDeleted) return; // Skip deleted expenses
+
             if (!categoryTotals[expense.category]) {
                 categoryTotals[expense.category] = {
                     category: expense.category,
@@ -384,7 +391,7 @@ function useCreateExpenseContext() {
         return {
             categories: Object.values(categoryTotals).sort((a, b) => b.total - a.total),
             total: grandTotal,
-            count: expenses.length,
+            count: expenses.filter(e => !e.isDeleted).length,
         };
     }, [expenses]);
 
@@ -396,8 +403,9 @@ function useCreateExpenseContext() {
         const budgetStart = new Date(budget.startDate);
         const budgetEnd = new Date(budget.endDate);
 
-        // Filter expenses within budget period
+        // Filter expenses within budget period and NOT deleted
         const budgetExpenses = expenses.filter(expense => {
+            if (expense.isDeleted) return false;
             const expenseDate = new Date(expense.date);
             return expenseDate >= budgetStart && expenseDate <= budgetEnd;
         });
@@ -423,8 +431,8 @@ function useCreateExpenseContext() {
 
     // Filter expenses by category
     const filteredExpenses = useMemo(() => {
-        if (!selectedCategory) return expenses;
-        return expenses.filter(e => e.category === selectedCategory);
+        if (!selectedCategory) return expenses.filter(e => !e.isDeleted);
+        return expenses.filter(e => e.category === selectedCategory && !e.isDeleted);
     }, [expenses, selectedCategory]);
 
     return {
@@ -472,6 +480,7 @@ export function useMonthlyExpenses() {
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
         return allExpenses.filter(expense => {
+            if (expense.isDeleted) return false;
             const expenseDate = new Date(expense.date);
             return expenseDate >= startOfMonth && expenseDate <= endOfMonth;
         });

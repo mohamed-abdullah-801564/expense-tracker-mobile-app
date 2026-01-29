@@ -6,8 +6,9 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
+    Modal,
 } from 'react-native';
-import { Calendar, Clock, Filter } from 'lucide-react-native';
+import { Calendar, Clock, Filter, Bot, X } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FilterType, filterExpensesByType, FilteredExpenseResult } from '@/utils/expense-filter';
@@ -18,6 +19,7 @@ import { ExpenseHistoryDemo } from '@/components/ExpenseHistoryDemo';
 export default function HistoryScreen() {
     const { allExpenses, isLoading } = useExpenses();
     const { colors } = useTheme();
+    const [showAIAssistant, setShowAIAssistant] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState<FilterType>('This Month');
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         searchText: '',
@@ -35,14 +37,18 @@ export default function HistoryScreen() {
 
     const styles = createStyles(colors);
 
-    const renderExpenseItem = useCallback(({ item }: { item: FilteredExpenseResult }) => (
-        <View style={styles.expenseItem}>
+    const renderExpenseItem = useCallback(({ item }: { item: FilteredExpenseResult & { isDeleted?: boolean } }) => (
+        <View style={[styles.expenseItem, item.isDeleted && styles.deletedItem]}>
             <View style={styles.expenseHeader}>
                 <View style={styles.expenseInfo}>
-                    <Text style={styles.expenseDescription}>{item.description}</Text>
+                    <Text style={[styles.expenseDescription, item.isDeleted && styles.deletedText]}>
+                        {item.description} {item.isDeleted && '(Deleted)'}
+                    </Text>
                     <Text style={styles.expenseCategory}>{item.category}</Text>
                 </View>
-                <Text style={styles.expenseAmount}>₹{item.amount.toFixed(2)}</Text>
+                <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
+                    ₹{item.amount.toFixed(2)}
+                </Text>
             </View>
             <View style={styles.expenseFooter}>
                 <View style={styles.dateTimeContainer}>
@@ -92,6 +98,9 @@ export default function HistoryScreen() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Expense History</Text>
                 <View style={styles.filterContainer}>
+                    <TouchableOpacity onPress={() => setShowAIAssistant(true)}>
+                        <Bot size={24} color={colors.primary} style={{ marginRight: 16 }} />
+                    </TouchableOpacity>
                     <Filter size={16} color={colors.textSecondary} />
                     <Text style={styles.filterLabel}>Filter:</Text>
                 </View>
@@ -103,7 +112,24 @@ export default function HistoryScreen() {
                 placeholder="Search by description, amount, or date..."
             />
 
-            <ExpenseHistoryDemo />
+            <Modal
+                visible={showAIAssistant}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowAIAssistant(false)}
+            >
+                <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>AI Assistant</Text>
+                            <TouchableOpacity onPress={() => setShowAIAssistant(false)}>
+                                <X size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ExpenseHistoryDemo />
+                    </View>
+                </View>
+            </Modal>
 
             <View style={styles.filtersRow}>
                 {(['This Month', 'Total Expenses'] as FilterType[]).map(renderFilterButton)}
@@ -314,5 +340,40 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         marginTop: 16,
         textAlign: 'center',
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center', // Centered card style or 'flex-end' for slide up
+        padding: 20,
+    },
+    modalContent: {
+        borderRadius: 20,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    deletedItem: {
+        opacity: 0.6,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    deletedText: {
+        textDecorationLine: 'line-through',
+        color: colors.textSecondary,
     },
 });
