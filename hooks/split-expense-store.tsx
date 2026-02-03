@@ -70,9 +70,9 @@ function useCreateSplitExpenseContext() {
         saveSplitExpenses(updated);
     }, [splitExpenses, saveSplitExpenses]);
 
-    const updateFriendName = useCallback((splitId: string, newName: string) => {
+    const updateFriendName = useCallback((oldName: string, newName: string) => {
         const updated = splitExpenses.map(split =>
-            split.id === splitId ? { ...split, friendName: newName } : split
+            split.friendName === oldName ? { ...split, friendName: newName } : split
         );
         setSplitExpenses(updated);
         saveSplitExpenses(updated);

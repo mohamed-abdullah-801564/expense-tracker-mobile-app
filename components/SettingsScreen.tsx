@@ -366,17 +366,19 @@ export default function SettingsScreen() {
             <Modal
                 visible={showHowItWorks}
                 animationType="slide"
-                presentationStyle="fullScreen"
+                transparent={true}
                 onRequestClose={() => setShowHowItWorks(false)}
             >
-                <View style={styles.guideModalContainer}>
-                    <View style={styles.guideModalHeader}>
-                        <Text style={styles.guideModalTitle}>App Guide</Text>
-                        <TouchableOpacity onPress={() => setShowHowItWorks(false)}>
-                            <Text style={styles.cancelButton}>Close</Text>
-                        </TouchableOpacity>
+                <View style={styles.guideModalOverlay}>
+                    <View style={styles.guideModalContainer}>
+                        <View style={styles.guideModalHeader}>
+                            <Text style={styles.guideModalTitle}>App Guide</Text>
+                            <TouchableOpacity onPress={() => setShowHowItWorks(false)}>
+                                <Text style={styles.cancelButton}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <HowItWorksScreen onClose={() => setShowHowItWorks(false)} />
                     </View>
-                    <HowItWorksScreen onClose={() => setShowHowItWorks(false)} />
                 </View>
             </Modal>
 
@@ -757,9 +759,17 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.text,
         fontWeight: '600',
     },
-    guideModalContainer: {
+    guideModalOverlay: {
         flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    guideModalContainer: {
         backgroundColor: colors.background,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '90%',
+        overflow: 'hidden',
     },
     guideModalHeader: {
         flexDirection: 'row',

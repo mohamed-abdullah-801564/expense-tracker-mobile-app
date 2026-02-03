@@ -10,7 +10,7 @@ import {
     TextInput,
     Alert
 } from 'react-native';
-import { Users, CheckCircle, Edit2, Trash2, X, AlertTriangle, ArrowUpRight, ArrowDownLeft } from 'lucide-react-native';
+import { Users, CheckCircle, Edit2, Trash2, X, AlertTriangle, ArrowUpRight, ArrowDownLeft, Plus } from 'lucide-react-native';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FriendSummary, SplitExpense } from '@/types/expense';
@@ -27,12 +27,23 @@ export default function FriendsScreen() {
     // Debt Modal State
     const [debtModal, setDebtModal] = useState<{ visible: boolean; type: 'lend' | 'borrow' }>({ visible: false, type: 'lend' });
     const [debtInput, setDebtInput] = useState('');
+    const [debtDescription, setDebtDescription] = useState('');
+
+    // Quick Action State
+    const [quickAction, setQuickAction] = useState<{ visible: boolean; friendName: string }>({ visible: false, friendName: '' });
+    const [quickAmount, setQuickAmount] = useState('');
+    const [quickDescription, setQuickDescription] = useState('');
 
     const styles = createStyles(colors);
 
     const handleDebtSubmit = () => {
         if (!debtInput.trim()) {
             setDebtModal({ ...debtModal, visible: false });
+            return;
+        }
+
+        if (!debtDescription.trim()) {
+            Alert.alert("Reason Required", "Please enter a reason for this transaction (e.g., Lunch, Movie).");
             return;
         }
 
@@ -60,7 +71,7 @@ export default function FriendsScreen() {
                 expenseId: `debt_${Date.now()}`,
                 friendName: parsed.friendName,
                 amount: parsed.amount,
-                description: parsed.description,
+                description: debtDescription.trim(),
                 category: 'Other',
                 date: new Date().toISOString(),
                 isPaid: false,
@@ -70,6 +81,7 @@ export default function FriendsScreen() {
 
             addSplitExpenses([newSplit]);
             setDebtInput('');
+            setDebtDescription('');
             setDebtModal({ ...debtModal, visible: false });
         } else {
             Alert.alert("Invalid Input", "Could not understand the amount or friend name. Try '500 to Ram'.");
@@ -97,6 +109,39 @@ export default function FriendsScreen() {
 
     const toggleExpand = (friendName: string) => {
         setExpandedFriend(expandedFriend === friendName ? null : friendName);
+    };
+
+    const handleQuickSubmit = (type: 'lend' | 'borrow') => {
+        if (!quickAmount || isNaN(parseFloat(quickAmount)) || !quickDescription.trim()) {
+            Alert.alert("Invalid Input", "Please enter a valid amount and description.");
+            return;
+        }
+
+        const newSplit: SplitExpense = {
+            id: Date.now().toString(),
+            expenseId: `quick_${Date.now()}`,
+            friendName: quickAction.friendName,
+            amount: parseFloat(quickAmount),
+            description: quickDescription,
+            category: 'Other',
+            date: new Date().toISOString(),
+            isPaid: false,
+            createdAt: new Date().toISOString(),
+            type: type
+        };
+
+        addSplitExpenses([newSplit]);
+
+        // Reset and close
+        setQuickAmount('');
+        setQuickDescription('');
+        setQuickAction({ visible: false, friendName: '' });
+    };
+
+    const openQuickAction = (friendName: string) => {
+        setQuickAction({ visible: true, friendName });
+        setQuickAmount('');
+        setQuickDescription('');
     };
 
     const renderSplitItem = (split: SplitExpense) => {
@@ -189,10 +234,16 @@ export default function FriendsScreen() {
                             </Text>
                         </View>
                     </View>
+                    <TouchableOpacity
+                        style={styles.quickActionButton}
+                        onPress={() => openQuickAction(item.friendName)}
+                    >
+                        <Plus size={20} color="white" />
+                    </TouchableOpacity>
                     <View style={styles.splitCountBadge}>
                         <Text style={styles.splitCountText}>{item.splitCount}</Text>
                     </View>
-                </TouchableOpacity>
+                </TouchableOpacity >
 
                 {isExpanded && (
                     <View style={styles.expandedContent}>
@@ -210,8 +261,9 @@ export default function FriendsScreen() {
                             </>
                         )}
                     </View>
-                )}
-            </View>
+                )
+                }
+            </View >
         );
     }, [expandedFriend, colors, styles, setEditingSplit, toggleExpand]);
 
@@ -320,7 +372,11 @@ export default function FriendsScreen() {
                             <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
                                 {debtModal.type === 'lend' ? 'Lent Money' : 'Borrowed Money'}
                             </Text>
-                            <TouchableOpacity onPress={() => setDebtModal({ visible: false, type: 'lend' })}>
+                            <TouchableOpacity onPress={() => {
+                                setDebtModal({ visible: false, type: 'lend' });
+                                setDebtDescription('');
+                                setDebtInput('');
+                            }}>
                                 <X size={24} color={colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
@@ -329,12 +385,23 @@ export default function FriendsScreen() {
                             e.g. "500 {debtModal.type === 'lend' ? 'to' : 'from'} Ram"
                         </Text>
                         <TextInput
-                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                            placeholder={debtModal.type === 'lend' ? "Amount to Friend..." : "Amount from Friend..."}
+                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, marginBottom: 12 }]}
+                            placeholder={debtModal.type === 'lend' ? "Amount (e.g. 500 to Ram)..." : "Amount (e.g. 500 from Ram)..."}
                             placeholderTextColor={colors.textSecondary}
                             value={debtInput}
                             onChangeText={setDebtInput}
                             autoFocus
+                        />
+
+                        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                            Reason (Required)
+                        </Text>
+                        <TextInput
+                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            placeholder="e.g. Lunch, Movie, Ticket"
+                            placeholderTextColor={colors.textSecondary}
+                            value={debtDescription}
+                            onChangeText={setDebtDescription}
                         />
 
                         <TouchableOpacity
@@ -343,6 +410,63 @@ export default function FriendsScreen() {
                         >
                             <Text style={styles.saveButtonText}>Save</Text>
                         </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={quickAction.visible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setQuickAction({ ...quickAction, visible: false })}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.deleteModal, { backgroundColor: colors.surface }]}>
+                        <View style={styles.deleteModalHeader}>
+                            <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
+                                {quickAction.friendName}
+                            </Text>
+                            <TouchableOpacity onPress={() => setQuickAction({ ...quickAction, visible: false })}>
+                                <X size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Amount</Text>
+                        <TextInput
+                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            placeholder="0.00"
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="numeric"
+                            value={quickAmount}
+                            onChangeText={setQuickAmount}
+                            autoFocus
+                        />
+
+                        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Reason (Required)</Text>
+                        <TextInput
+                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            placeholder="e.g. Lunch, Ticket, Tea"
+                            placeholderTextColor={colors.textSecondary}
+                            value={quickDescription}
+                            onChangeText={setQuickDescription}
+                        />
+
+                        <View style={styles.deleteModalButtons}>
+                            <TouchableOpacity
+                                style={[styles.deleteModalButton, { backgroundColor: colors.success }]}
+                                onPress={() => handleQuickSubmit('lend')}
+                            >
+                                <ArrowUpRight size={20} color="white" style={{ marginBottom: 4 }} />
+                                <Text style={styles.confirmDeleteText}>Gave / Lent</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.deleteModalButton, { backgroundColor: colors.error }]}
+                                onPress={() => handleQuickSubmit('borrow')}
+                            >
+                                <ArrowDownLeft size={20} color="white" style={{ marginBottom: 4 }} />
+                                <Text style={styles.confirmDeleteText}>Got / Borrowed</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -528,6 +652,15 @@ const createStyles = (colors: any) => StyleSheet.create({
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        marginLeft: 8,
+    },
+    quickActionButton: {
+        backgroundColor: colors.primary,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginLeft: 12,
     },
     splitCountText: {
@@ -676,6 +809,11 @@ const createStyles = (colors: any) => StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 20,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 8,
     },
     deleteModalTitle: {
         fontSize: 20,

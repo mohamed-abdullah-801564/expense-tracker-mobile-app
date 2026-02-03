@@ -13,6 +13,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FilterType, filterExpensesByType, FilteredExpenseResult } from '@/utils/expense-filter';
 import { SearchFilters, searchAndFilterExpenses } from '@/utils/search-filter';
+import { useDebounce } from '@/hooks/use-debounce';
 import SearchBar from '@/components/SearchBar';
 import { ExpenseHistoryDemo } from '@/components/ExpenseHistoryDemo';
 
@@ -30,10 +31,13 @@ export default function HistoryScreen() {
         amountMax: undefined,
     });
 
+    const debouncedSearchFilters = useDebounce(searchFilters, 300);
+
     const filteredExpenses = useMemo(() => {
         const timeFiltered = filterExpensesByType(allExpenses, selectedFilter);
-        return searchAndFilterExpenses(timeFiltered, searchFilters);
-    }, [allExpenses, selectedFilter, searchFilters]);
+        // Use debounced filters for expensive filtering operation
+        return searchAndFilterExpenses(timeFiltered, debouncedSearchFilters);
+    }, [allExpenses, selectedFilter, debouncedSearchFilters]);
 
     const styles = createStyles(colors);
 

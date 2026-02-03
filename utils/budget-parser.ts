@@ -1,6 +1,8 @@
 import { ParsedBudget, BudgetCalculationInput, BudgetCalculationResult } from '@/types/expense';
 import { validateAmount } from './expense-parser';
 
+const LLM_API_URL = 'https://toolkit.rork.com/text/llm/';
+
 export async function parseBudgetWithAI(input: string): Promise<ParsedBudget> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -30,7 +32,7 @@ Output: { "budget_amount": 5000, "budget_days": null, "is_add_operation": false 
 Input: 'Increase budget by 500'
 Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`;
 
-        const response = await fetch('https://toolkit.rork.com/text/llm/', {
+        const response = await fetch(LLM_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -96,7 +98,8 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
 }
 
 function fallbackBudgetParser(input: string): ParsedBudget {
-    // Extract amount using regex
+    // Extract amount using regex - looks for numbers, potentially preceded by currency symbol
+    // Also explicitly look for "Budget X" pattern if generic match fails or to confirm intent
     const amountMatch = input.match(/₹?(\d+(?:\.\d+)?)/);
     const budget_amount = amountMatch ? parseFloat(amountMatch[1]) : 1000;
     const lowerInput = input.toLowerCase();
@@ -124,8 +127,11 @@ function fallbackBudgetParser(input: string): ParsedBudget {
         }
     }
 
-    // Default only if not adding and no duration found - actually, let's keep it null for strict checking
-    // But for backward compatibility in logic, we return null if not found.
+    // Default to 30 days if no duration is specified and it's NOT an add operation
+    // This handles cases like "Budget 5000" -> 5000 for 30 days
+    if (budget_days === null && !is_add_operation) {
+        budget_days = 30;
+    }
 
     return { budget_amount, budget_days, is_add_operation };
 }

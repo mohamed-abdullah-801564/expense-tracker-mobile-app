@@ -27,7 +27,7 @@ export function EditFriendNameModal({ visible, split, onClose }: EditFriendNameM
 
     const handleSave = () => {
         if (newName.trim() && newName.trim() !== split.friendName) {
-            updateFriendName(split.id, newName.trim());
+            updateFriendName(split.friendName, newName.trim());
         }
         onClose();
     };

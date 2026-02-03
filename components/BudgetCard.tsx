@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
-import { Target, AlertTriangle, CheckCircle, Clock } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, TextInput } from 'react-native';
+import { Target, AlertTriangle, CheckCircle, Clock, Plus, X } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 
@@ -9,9 +9,28 @@ interface BudgetCardProps {
 }
 
 export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
-    const { budgetProgress, clearBudget } = useExpenses();
+    const { budgetProgress, clearBudget, setBudgetData } = useExpenses();
     const { colors } = useTheme();
+    const [showTopUp, setShowTopUp] = useState(false);
+    const [topUpAmount, setTopUpAmount] = useState('');
     const styles = createStyles(colors);
+
+    const handleTopUp = () => {
+        if (!topUpAmount || isNaN(parseFloat(topUpAmount))) {
+            Alert.alert("Invalid Amount", "Please enter a valid number.");
+            return;
+        }
+
+        const amount = parseFloat(topUpAmount);
+        // days=0 because for 'add' type, it should ignore days and keep existing dates if implemented correctly in store.
+        // Even if store needs days, we should probably pass 0 or current days.
+        // Checking store logic: if type === 'add', it uses existing budget dates.
+        setBudgetData(amount, 0, 'add');
+
+        setShowTopUp(false);
+        setTopUpAmount('');
+        Alert.alert("Success", "Budget updated successfully!");
+    };
 
     if (!budgetProgress) {
         return (
@@ -55,6 +74,10 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
         return colors.success;
     };
 
+    const dailyLimit = budgetProgress.daysRemaining > 0
+        ? Math.max(0, budgetProgress.remaining) / budgetProgress.daysRemaining
+        : 0;
+
     const handleClearBudget = () => {
         Alert.alert(
             "Clear Budget",
@@ -74,13 +97,14 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
     };
 
     return (
-        <View style={styles.budgetCard}>
+        <View style={styles.container}>
+            {/* Header */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Target size={20} color={colors.primary} />
-                    <Text style={styles.title}>Budget Progress</Text>
+                <View style={styles.headerTitleRow}>
+                    <Target size={18} color={colors.primary} style={styles.headerIcon} />
+                    <Text style={styles.headerTitle}>Budget Progress</Text>
                 </View>
-                <View style={styles.status}>
+                <View style={[styles.statusPill, { backgroundColor: getStatusColor() + '20' }]}>
                     {getStatusIcon()}
                     <Text style={[styles.statusText, { color: getStatusColor() }]}>
                         {getStatusText()}
@@ -88,61 +112,96 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
                 </View>
             </View>
 
-            <View style={styles.amounts}>
-                <View style={styles.amountItem}>
-                    <Text style={styles.amountLabel}>Spent</Text>
-                    <Text style={[styles.amountValue, { color: budgetProgress.isOverBudget ? colors.error : colors.text }]}>
-                        ₹{budgetProgress.totalSpent.toLocaleString()}
+            {/* Main Content */}
+            <View style={styles.mainContent}>
+                <Text style={[styles.remainingAmount, { color: colors.text }]}>
+                    ₹{budgetProgress.remaining.toLocaleString()}
+                </Text>
+
+                <View style={styles.totalRow}>
+                    <Text style={styles.totalText}>
+                        of ₹{budgetProgress.budget.amount.toLocaleString()} total
                     </Text>
-                </View>
-                <View style={styles.amountItem}>
-                    <Text style={styles.amountLabel}>Budget</Text>
-                    <Text style={styles.amountValue}>
-                        ₹{budgetProgress.budget.amount.toLocaleString()}
-                    </Text>
-                </View>
-                <View style={styles.amountItem}>
-                    <Text style={styles.amountLabel}>Remaining</Text>
-                    <Text style={[styles.amountValue, { color: budgetProgress.remaining >= 0 ? colors.success : colors.error }]}>
-                        ₹{budgetProgress.remaining.toLocaleString()}
-                    </Text>
+                    <TouchableOpacity onPress={() => setShowTopUp(true)} style={styles.topUpButton}>
+                        <Plus size={14} color="white" />
+                    </TouchableOpacity>
                 </View>
             </View>
 
-            <View style={styles.progressSection}>
-                <View style={styles.progressBar}>
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+                <View style={[styles.progressBarBackground, { backgroundColor: colors.border }]}>
                     <View
                         style={[
-                            styles.progressFill,
+                            styles.progressBarFill,
                             {
                                 width: `${Math.min(budgetProgress.percentageUsed, 100)}%`,
-                                backgroundColor: budgetProgress.isOverBudget ? colors.error : colors.success
+                                backgroundColor: budgetProgress.isOverBudget ? colors.error : colors.primary
                             }
                         ]}
                     />
                 </View>
-                <Text style={styles.progressText}>
-                    {budgetProgress.percentageUsed.toFixed(1)}% used
-                </Text>
             </View>
 
-            <View style={styles.timeInfo}>
-                <Text style={styles.timeText}>
-                    {budgetProgress.isExpired
-                        ? 'Budget period ended'
-                        : `${budgetProgress.daysRemaining} days remaining`
-                    }
-                </Text>
+            {/* Footer Info */}
+            <View style={styles.footer}>
+                <View style={styles.footerItem}>
+                    <Text style={[styles.footerHighlight, { color: colors.primary }]}>
+                        ₹{dailyLimit.toFixed(0)}
+                        <Text style={styles.footerLabel}>/day limit</Text>
+                    </Text>
+                </View>
+                <View style={styles.footerItem}>
+                    <Text style={styles.footerLabel}>
+                        {budgetProgress.isExpired ? 'Ended' : `${budgetProgress.daysRemaining} days left`}
+                    </Text>
+                </View>
             </View>
 
-            <View style={styles.actions}>
-                <TouchableOpacity style={styles.updateButton} onPress={onSetBudget}>
-                    <Text style={styles.updateButtonText}>Update Budget</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.clearButton} onPress={handleClearBudget}>
-                    <Text style={styles.clearButtonText}>Clear</Text>
-                </TouchableOpacity>
-            </View>
+            {/* Actions */}
+            <TouchableOpacity style={styles.clearAction} onPress={handleClearBudget}>
+                <Text style={[styles.clearActionText, { color: colors.textSecondary }]}>Clear Budget</Text>
+            </TouchableOpacity>
+
+            {/* Top Up Modal */}
+            <Modal
+                visible={showTopUp}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowTopUp(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>Add to Budget</Text>
+                            <TouchableOpacity onPress={() => setShowTopUp(false)}>
+                                <X size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                            Increase your budget amount for the current period.
+                        </Text>
+
+                        <TextInput
+                            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            placeholder="Amount to add..."
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="numeric"
+                            value={topUpAmount}
+                            onChangeText={setTopUpAmount}
+                            autoFocus
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                            onPress={handleTopUp}
+                        >
+                            <Text style={styles.saveButtonText}>Add Amount</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -150,10 +209,10 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
 const createStyles = (colors: any) => StyleSheet.create({
     noBudgetCard: {
         backgroundColor: colors.background,
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: 20,
+        padding: 24,
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
         borderWidth: 2,
         borderColor: colors.border,
         borderStyle: 'dashed',
@@ -162,7 +221,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: colors.text,
-        marginTop: 8,
+        marginTop: 12,
         marginBottom: 4,
     },
     noBudgetSubtitle: {
@@ -170,113 +229,168 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         textAlign: 'center',
     },
-    budgetCard: {
+    container: {
         backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
+        borderRadius: 24,
+        padding: 24,
+        marginBottom: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 24,
     },
-    headerLeft: {
+    headerTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    title: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: colors.text,
-        marginLeft: 8,
+    headerIcon: {
+        marginRight: 8,
     },
-    status: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statusText: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginLeft: 4,
-    },
-    amounts: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-    },
-    amountItem: {
-        alignItems: 'center',
-    },
-    amountLabel: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        marginBottom: 4,
-    },
-    amountValue: {
+    headerTitle: {
         fontSize: 16,
         fontWeight: '600',
         color: colors.text,
+        letterSpacing: 0.5,
     },
-    progressSection: {
-        marginBottom: 16,
+    statusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 6,
     },
-    progressBar: {
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    mainContent: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    remainingAmount: {
+        fontSize: 36,
+        fontWeight: '700',
+        marginBottom: 4,
+        letterSpacing: -0.5,
+    },
+    totalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    totalText: {
+        fontSize: 15,
+        color: colors.textSecondary,
+        fontWeight: '500',
+    },
+    topUpButton: {
+        backgroundColor: colors.primary,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    progressContainer: {
+        marginBottom: 20,
+    },
+    progressBarBackground: {
         height: 8,
-        backgroundColor: colors.border,
         borderRadius: 4,
-        marginBottom: 8,
+        width: '100%',
+        overflow: 'hidden',
     },
-    progressFill: {
+    progressBarFill: {
         height: '100%',
         borderRadius: 4,
     },
-    progressText: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        textAlign: 'center',
-    },
-    timeInfo: {
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    timeText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
-    actions: {
+    footer: {
         flexDirection: 'row',
-        gap: 8,
-    },
-    updateButton: {
-        flex: 1,
-        backgroundColor: colors.primary,
-        borderRadius: 8,
-        padding: 12,
+        justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 20,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
     },
-    updateButtonText: {
-        color: '#fff',
+    footerItem: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    footerHighlight: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    footerLabel: {
         fontSize: 14,
-        fontWeight: '600',
-    },
-    clearButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: 'center',
-    },
-    clearButtonText: {
         color: colors.textSecondary,
-        fontSize: 14,
         fontWeight: '500',
+    },
+    clearAction: {
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    clearActionText: {
+        fontSize: 13,
+        textDecorationLine: 'underline',
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalCard: {
+        width: '100%',
+        borderRadius: 24,
+        padding: 24,
+        maxWidth: 340,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    modalSubtitle: {
+        fontSize: 15,
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    input: {
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 16,
+        fontSize: 18,
+        marginBottom: 24,
+    },
+    saveButton: {
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+    },
+    saveButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

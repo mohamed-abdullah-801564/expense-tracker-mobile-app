@@ -102,20 +102,22 @@ export default function ExpensesScreen() {
       <Modal
         visible={showGuide}
         animationType="slide"
-        presentationStyle="fullScreen"
+        transparent={true}
         onRequestClose={handleCloseGuide}
       >
-        <View style={styles.guideModalContainer}>
-          <View style={styles.guideModalHeader}>
-            <Text style={styles.guideModalTitle}>Welcome to Expense Tracker!</Text>
-            <TouchableOpacity onPress={handleCloseGuide}>
-              <Text style={styles.closeButton}>Close</Text>
-            </TouchableOpacity>
+        <View style={styles.guideModalOverlay}>
+          <View style={styles.guideModalContainer}>
+            <View style={styles.guideModalHeader}>
+              <Text style={styles.guideModalTitle}>Welcome to Expense Tracker!</Text>
+              <TouchableOpacity onPress={handleCloseGuide}>
+                <Text style={styles.closeButton}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <HowItWorksScreen
+              onGetStarted={handleCloseGuide}
+              showGetStartedButton={true}
+            />
           </View>
-          <HowItWorksScreen
-            onGetStarted={handleCloseGuide}
-            showGetStartedButton={true}
-          />
         </View>
       </Modal>
 
@@ -215,9 +217,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  guideModalContainer: {
+  guideModalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  guideModalContainer: {
     backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '90%',
+    overflow: 'hidden',
   },
   guideModalHeader: {
     flexDirection: 'row',

@@ -148,7 +148,7 @@ function useCreateExpenseContext() {
             console.log(`Loaded ${expenses.length} expenses from storage`);
             return expenses;
         },
-        staleTime: 0, // Always fetch fresh data on mount
+        staleTime: Infinity, // Expenses don't change unless we change them
         gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
     });
 
@@ -160,7 +160,7 @@ function useCreateExpenseContext() {
             console.log('Loaded budget from storage:', budget ? 'Found' : 'None');
             return budget;
         },
-        staleTime: 0,
+        staleTime: Infinity,
         gcTime: 1000 * 60 * 5,
     });
 
@@ -172,7 +172,7 @@ function useCreateExpenseContext() {
             console.log(`Loaded ${history.length} budget transactions from storage`);
             return history;
         },
-        staleTime: 0,
+        staleTime: Infinity,
         gcTime: 1000 * 60 * 5,
     });
 
@@ -186,8 +186,8 @@ function useCreateExpenseContext() {
             console.log(`Saved ${newExpenses.length} expenses to storage`);
             return newExpenses;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['expenses'] });
+        onSuccess: (newExpenses) => {
+            queryClient.setQueryData(['expenses'], newExpenses);
         },
         onError: (error) => {
             console.error('Failed to save expenses:', error);
@@ -211,8 +211,8 @@ function useCreateExpenseContext() {
             }
             return newBudget;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['budget'] });
+        onSuccess: (newBudget) => {
+            queryClient.setQueryData(['budget'], newBudget);
         },
         onError: (error) => {
             console.error('Failed to save budget:', error);
@@ -230,8 +230,8 @@ function useCreateExpenseContext() {
             console.log(`Saved ${newHistory.length} budget transactions to storage`);
             return newHistory;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['budget_history'] });
+        onSuccess: (newHistory) => {
+            queryClient.setQueryData(['budget_history'], newHistory);
         },
         onError: (error) => {
             console.error('Failed to save budget history:', error);
@@ -351,9 +351,9 @@ function useCreateExpenseContext() {
         const success = await StorageUtils.importData(data);
         if (success) {
             // Refresh all queries to show imported data
-            queryClient.invalidateQueries({ queryKey: ['expenses'] });
-            queryClient.invalidateQueries({ queryKey: ['budget'] });
-            queryClient.invalidateQueries({ queryKey: ['budget_history'] });
+            queryClient.setQueryData(['expenses'], data.expenses || []);
+            queryClient.setQueryData(['budget'], data.budget || null);
+            queryClient.setQueryData(['budget_history'], data.budgetHistory || []);
         }
         return success;
     }, [queryClient]);
