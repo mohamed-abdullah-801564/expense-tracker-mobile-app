@@ -42,10 +42,7 @@ export default function FriendsScreen() {
             return;
         }
 
-        if (!debtDescription.trim()) {
-            Alert.alert("Reason Required", "Please enter a reason for this transaction (e.g., Lunch, Movie).");
-            return;
-        }
+
 
         // Construct input string for parsing if user just typed number
         let inputToParse = debtInput;
@@ -71,7 +68,7 @@ export default function FriendsScreen() {
                 expenseId: `debt_${Date.now()}`,
                 friendName: parsed.friendName,
                 amount: parsed.amount,
-                description: debtDescription.trim(),
+                description: debtDescription.trim() || (debtModal.type === 'lend' ? 'Lent' : 'Borrowed'),
                 category: 'Other',
                 date: new Date().toISOString(),
                 isPaid: false,
@@ -112,8 +109,8 @@ export default function FriendsScreen() {
     };
 
     const handleQuickSubmit = (type: 'lend' | 'borrow') => {
-        if (!quickAmount || isNaN(parseFloat(quickAmount)) || !quickDescription.trim()) {
-            Alert.alert("Invalid Input", "Please enter a valid amount and description.");
+        if (!quickAmount || isNaN(parseFloat(quickAmount))) {
+            Alert.alert("Invalid Input", "Please enter a valid amount.");
             return;
         }
 
@@ -122,7 +119,7 @@ export default function FriendsScreen() {
             expenseId: `quick_${Date.now()}`,
             friendName: quickAction.friendName,
             amount: parseFloat(quickAmount),
-            description: quickDescription,
+            description: quickDescription.trim() || 'Quick Update',
             category: 'Other',
             date: new Date().toISOString(),
             isPaid: false,
@@ -394,11 +391,11 @@ export default function FriendsScreen() {
                         />
 
                         <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-                            Reason (Required)
+                            Reason (Optional)
                         </Text>
                         <TextInput
                             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                            placeholder="e.g. Lunch, Movie, Ticket"
+                            placeholder="e.g. Lunch, Movie (Optional)"
                             placeholderTextColor={colors.textSecondary}
                             value={debtDescription}
                             onChangeText={setDebtDescription}
@@ -442,10 +439,10 @@ export default function FriendsScreen() {
                             autoFocus
                         />
 
-                        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Reason (Required)</Text>
+                        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Reason (Optional)</Text>
                         <TextInput
                             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                            placeholder="e.g. Lunch, Ticket, Tea"
+                            placeholder="e.g. Lunch, Ticket (Optional)"
                             placeholderTextColor={colors.textSecondary}
                             value={quickDescription}
                             onChangeText={setQuickDescription}
@@ -865,10 +862,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
         color: 'white',
     },
-    inputLabel: {
-        fontSize: 14,
-        marginBottom: 8,
-    },
+
     input: {
         borderWidth: 1,
         borderRadius: 12,
