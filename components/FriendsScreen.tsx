@@ -42,27 +42,21 @@ export default function FriendsScreen() {
             return;
         }
 
+        const normalizedInput = debtInput.toLowerCase();
+        const hasDebtKeyword =
+            normalizedInput.includes('borrow') ||
+            normalizedInput.includes('lend') ||
+            normalizedInput.includes('gave') ||
+            normalizedInput.includes('got');
 
-
-        // Construct input string for parsing if user just typed number
         let inputToParse = debtInput;
-        // If user just typed "500", append keyword based on type
-        if (!debtInput.toLowerCase().includes('borrow') && !debtInput.toLowerCase().includes('lend') && !debtInput.toLowerCase().includes('gave') && !debtInput.toLowerCase().includes('got')) {
-            if (debtModal.type === 'lend') inputToParse = `Lent ${debtInput}`;
-            else inputToParse = `Borrowed ${debtInput}`;
+        if (!hasDebtKeyword) {
+            inputToParse = debtModal.type === 'lend' ? `Lent ${debtInput}` : `Borrowed ${debtInput}`;
         }
 
         const parsed = parseDebt(inputToParse);
 
         if (parsed) {
-            // Ensure the parsed type matches the modal intention (handling edge case where user types "borrow" in "lend" modal)
-            if (parsed.type !== debtModal.type) {
-                // If mismatch, respect what was parsed? Or enforce modal type?
-                // Let's force the type from the modal if explicit keywords weren't overriding.
-                // But parseDebt is strict. If user typed "Borrowed 500" in Lend modal, let's respect the text.
-                // If they typed just "500", our prepended string forces the type.
-            }
-
             const newSplit: SplitExpense = {
                 id: Date.now().toString(),
                 expenseId: `debt_${Date.now()}`,
@@ -73,7 +67,7 @@ export default function FriendsScreen() {
                 date: new Date().toISOString(),
                 isPaid: false,
                 createdAt: new Date().toISOString(),
-                type: parsed.type // 'lend' or 'borrow'
+                type: parsed.type
             };
 
             addSplitExpenses([newSplit]);

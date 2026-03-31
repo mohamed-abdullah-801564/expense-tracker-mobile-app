@@ -53,21 +53,6 @@ export interface ParsedBudget {
     is_add_operation?: boolean;
 }
 
-export interface BudgetCalculationInput {
-    budget_amount: number;
-    budget_days: number;
-    expense_amounts: number[];
-    remaining_days: number;
-}
-
-export interface BudgetCalculationResult {
-    total_expenses: number;
-    remaining_balance: number;
-    daily_limit: number;
-    updated_daily_limit: number;
-    remaining_days: number;
-}
-
 export interface BudgetTransaction {
     id: string;
     type: 'add' | 'replace';

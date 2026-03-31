@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, StyleSheet, Button, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
@@ -50,5 +50,3 @@ const styles = StyleSheet.create({
         marginTop: 10,
     }
 });
-
-import { Platform } from 'react-native';

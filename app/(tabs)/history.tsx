@@ -6,21 +6,18 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
-    Modal,
 } from 'react-native';
-import { Calendar, Clock, Filter, Bot, X } from 'lucide-react-native';
+import { Calendar, Clock, Filter } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FilterType, filterExpensesByType, FilteredExpenseResult } from '@/utils/expense-filter';
 import { SearchFilters, searchAndFilterExpenses } from '@/utils/search-filter';
 import { useDebounce } from '@/hooks/use-debounce';
 import SearchBar from '@/components/SearchBar';
-import { ExpenseHistoryDemo } from '@/components/ExpenseHistoryDemo';
 
 export default function HistoryScreen() {
     const { allExpenses, isLoading } = useExpenses();
     const { colors } = useTheme();
-    const [showAIAssistant, setShowAIAssistant] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState<FilterType>('This Month');
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         searchText: '',
@@ -102,9 +99,6 @@ export default function HistoryScreen() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Expense History</Text>
                 <View style={styles.filterContainer}>
-                    <TouchableOpacity onPress={() => setShowAIAssistant(true)}>
-                        <Bot size={24} color={colors.primary} style={{ marginRight: 16 }} />
-                    </TouchableOpacity>
                     <Filter size={16} color={colors.textSecondary} />
                     <Text style={styles.filterLabel}>Filter:</Text>
                 </View>
@@ -115,25 +109,6 @@ export default function HistoryScreen() {
                 onFiltersChange={setSearchFilters}
                 placeholder="Search by description, amount, or date..."
             />
-
-            <Modal
-                visible={showAIAssistant}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowAIAssistant(false)}
-            >
-                <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>AI Assistant</Text>
-                            <TouchableOpacity onPress={() => setShowAIAssistant(false)}>
-                                <X size={24} color={colors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-                        <ExpenseHistoryDemo />
-                    </View>
-                </View>
-            </Modal>
 
             <View style={styles.filtersRow}>
                 {(['This Month', 'Total Expenses'] as FilterType[]).map(renderFilterButton)}

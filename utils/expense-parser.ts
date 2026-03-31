@@ -14,9 +14,8 @@ export function validateAmount(amount: number): { valid: boolean; error?: string
 }
 
 export async function parseExpenseWithAI(input: string): Promise<ParsedExpense> {
-    try {
-        const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including shared expenses and payments to friends. When given a natural language input, your task is to:
-
+    const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including shared expenses and payments to friends. When given a natural language input, your task is to:
+        
 1. Extract the expense amount as a number.
 2. Extract the expense description or item name clearly.
 3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, or Other.
@@ -44,58 +43,40 @@ Output: { "amount": 60, "description": "Movie payment", "category": "Entertainme
 Input: 'Lunch 150 rupees at 1 PM'
 Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 PM" }`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        try {
-            const response = await fetch('https://toolkit.rork.com/text/llm/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: input }
-                    ]
-                }),
-                signal: controller.signal
-            });
+    try {
+        const response = await fetch('https://toolkit.rork.com/text/llm/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: input }
+                ]
+            }),
+            signal: controller.signal
+        });
 
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error('Failed to parse expense');
-            }
-
-            const data = await response.json();
-
-            // Continue with processing
-            var cleanedCompletion = data.completion.trim();
-        } catch (error: any) {
-            clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                console.log('Expense parsing timed out, falling back to basic parser');
-            } else {
-                console.error('Error parsing expense:', error);
-            }
-            return fallbackParser(input);
+        if (!response.ok) {
+            throw new Error('Failed to parse expense');
         }
 
-        // Clean the response to handle markdown code blocks and other formatting
-        // var is function scoped, but let's be cleaner and just do the processing here or assign to a let declared outside
+        const data = await response.json();
 
-        // Remove markdown code blocks if present
+        let cleanedCompletion = data.completion.trim();
+
         if (cleanedCompletion.startsWith('```json')) {
             cleanedCompletion = cleanedCompletion.replace(/^```json\s*/, '').replace(/\s*```$/, '');
         } else if (cleanedCompletion.startsWith('```')) {
             cleanedCompletion = cleanedCompletion.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
 
-        // Remove any leading/trailing backticks that might remain
         cleanedCompletion = cleanedCompletion.replace(/^`+|`+$/g, '');
 
-        // Try to extract JSON from the response if it's wrapped in other text
         const jsonMatch = cleanedCompletion.match(/\{[\s\S]*\}/s);
         if (jsonMatch) {
             cleanedCompletion = jsonMatch[0];
@@ -118,18 +99,14 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
             ...(parsed.note && { note: parsed.note })
         };
     } catch (error: any) {
-        if (error.name !== 'AbortError') {
-            // AbortError is handled in the inner catch if we had one, but here we merged them.
-            // Actually, the previous ReplacementChunk replaced the start of the try block but not the end.
-            // I need to be careful about where the Catch block is.
-            // The previous tool call replaced lines 47-64.
-            // The original code had the catch block at line 101.
-            // My previous replacement introduced a try/catch that ENDS inside the function body, which is wrong because there was already an outer try/catch.
-            // I should have replaced the whole body or been more careful.
-
-            // Let's fix the structure. I will replace the ENTIRE function body to be safe and clean.
+        if (error.name === 'AbortError') {
+            console.log('Expense parsing timed out, falling back to basic parser');
+        } else {
+            console.error('Error parsing expense:', error);
         }
         return fallbackParser(input);
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 

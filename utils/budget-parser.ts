@@ -1,4 +1,4 @@
-import { ParsedBudget, BudgetCalculationInput, BudgetCalculationResult } from '@/types/expense';
+import { ParsedBudget } from '@/types/expense';
 import { validateAmount } from './expense-parser';
 
 const LLM_API_URL = 'https://toolkit.rork.com/text/llm/';
@@ -134,19 +134,4 @@ function fallbackBudgetParser(input: string): ParsedBudget {
     }
 
     return { budget_amount, budget_days, is_add_operation };
-}
-
-export function calculateBudgetStats(input: BudgetCalculationInput): BudgetCalculationResult {
-    const total_expenses = input.expense_amounts.reduce((sum, amount) => sum + amount, 0);
-    const remaining_balance = input.budget_amount - total_expenses;
-    const daily_limit = input.budget_amount / input.budget_days;
-    const updated_daily_limit = input.remaining_days > 0 ? remaining_balance / input.remaining_days : 0;
-
-    return {
-        total_expenses,
-        remaining_balance,
-        daily_limit: Math.round(daily_limit * 100) / 100,
-        updated_daily_limit: Math.round(updated_daily_limit * 100) / 100,
-        remaining_days: input.remaining_days
-    };
 }

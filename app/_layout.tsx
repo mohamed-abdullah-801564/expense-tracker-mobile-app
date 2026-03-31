@@ -11,6 +11,7 @@ import { NotificationProvider } from '@/hooks/notification-store';
 import { ExpenseProvider } from '@/hooks/expense-store';
 import { SplitExpenseProvider } from '@/hooks/split-expense-store';
 import { FirstTimeProvider } from '@/hooks/first-time-store';
+import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -39,6 +40,7 @@ export default function RootLayout() {
                     <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
                   </Stack>
                   <StatusBar style="auto" />
+                  <FloatingAIAssistant />
                 </FirstTimeProvider>
               </SplitExpenseProvider>
             </NotificationProvider>
