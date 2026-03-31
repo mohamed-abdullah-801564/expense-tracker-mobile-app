@@ -344,7 +344,17 @@ function useCreateExpenseContext() {
 
     // Data export/import functions
     const exportAllData = useCallback(async () => {
-        return await StorageUtils.exportData();
+        const data = await StorageUtils.exportData();
+        if (!data) return null;
+        let text = '=== EXPORTED EXPENSES ===\n\n';
+        if (data.expenses && Array.isArray(data.expenses)) {
+            data.expenses.forEach((e: Expense) => {
+                if (!e.isDeleted) {
+                    text += `Date: ${e.date}\nDescription: ${e.description}\nAmount: ₹${e.amount.toFixed(2)}\nCategory: ${e.category}\n\n`;
+                }
+            });
+        }
+        return text;
     }, []);
 
     const importAllData = useCallback(async (data: any) => {

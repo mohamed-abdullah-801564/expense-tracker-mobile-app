@@ -11,6 +11,7 @@ import {
     Platform,
     ActivityIndicator,
     SafeAreaView,
+    DeviceEventEmitter,
 } from 'react-native';
 import { Bot, Send } from 'lucide-react-native';
 
@@ -25,7 +26,7 @@ type ChatMessage = {
 };
 
 export function FloatingAIAssistant() {
-    const { allExpenses, budgetProgress } = useExpenses();
+    const { allExpenses, budgetProgress, budgetHistory } = useExpenses();
     const { friendSummaries } = useSplitExpenses();
     const { colors } = useTheme();
 
@@ -38,6 +39,11 @@ export function FloatingAIAssistant() {
         () => typeof process.env.EXPO_PUBLIC_GEMINI_API_KEY === 'string' && !!process.env.EXPO_PUBLIC_GEMINI_API_KEY,
         []
     );
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener('openAIAssistant', () => setVisible(true));
+        return () => sub.remove();
+    }, []);
 
     useEffect(() => {
         setMessages((prev) => {
@@ -76,6 +82,7 @@ export function FloatingAIAssistant() {
             const contextData = {
                 expenses: allExpenses,
                 budget: budgetProgress,
+                budgetHistory: budgetHistory,
                 friends: friendSummaries,
             };
 
@@ -195,39 +202,11 @@ export function FloatingAIAssistant() {
                     </View>
                 </View>
             </Modal>
-
-            <View pointerEvents="box-none" style={styles.fabContainer}>
-                <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.primary }]}
-                    onPress={() => setVisible(true)}
-                    activeOpacity={0.8}
-                >
-                    <Bot size={24} color={colors.surface} />
-                </TouchableOpacity>
-            </View>
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    fabContainer: {
-        position: 'absolute',
-        right: 20,
-        bottom: 90,
-        zIndex: 100,
-        elevation: 5,
-    },
-    fab: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',

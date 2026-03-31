@@ -6,19 +6,22 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
+    Modal,
 } from 'react-native';
-import { Calendar, Clock, Filter } from 'lucide-react-native';
+import { Calendar, Clock, Filter, History as HistoryIcon } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FilterType, filterExpensesByType, FilteredExpenseResult } from '@/utils/expense-filter';
 import { SearchFilters, searchAndFilterExpenses } from '@/utils/search-filter';
 import { useDebounce } from '@/hooks/use-debounce';
 import SearchBar from '@/components/SearchBar';
+import { BudgetHistory } from '@/components/BudgetHistory';
 
 export default function HistoryScreen() {
-    const { allExpenses, isLoading } = useExpenses();
+    const { allExpenses, isLoading, budgetHistory } = useExpenses();
     const { colors } = useTheme();
     const [selectedFilter, setSelectedFilter] = useState<FilterType>('This Month');
+    const [showHistory, setShowHistory] = useState(false);
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         searchText: '',
         category: 'All',
@@ -112,6 +115,12 @@ export default function HistoryScreen() {
 
             <View style={styles.filtersRow}>
                 {(['This Month', 'Total Expenses'] as FilterType[]).map(renderFilterButton)}
+                <TouchableOpacity
+                    style={styles.historyButton}
+                    onPress={() => setShowHistory(true)}
+                >
+                    <HistoryIcon size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.summaryContainer}>
@@ -148,6 +157,17 @@ export default function HistoryScreen() {
                     </View>
                 }
             />
+
+            <Modal
+                visible={showHistory}
+                animationType="slide"
+                presentationStyle="pageSheet"
+            >
+                <BudgetHistory
+                    transactions={budgetHistory}
+                    onClose={() => setShowHistory(false)}
+                />
+            </Modal>
         </View>
     );
 }
@@ -189,6 +209,15 @@ const createStyles = (colors: any) => StyleSheet.create({
         backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
+    },
+    historyButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginLeft: 'auto',
     },
     filterButton: {
         paddingHorizontal: 16,

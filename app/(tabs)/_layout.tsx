@@ -2,6 +2,8 @@ import { Tabs } from "expo-router";
 import { Wallet, History, Settings, Users } from "lucide-react-native";
 import React from "react";
 import { useTheme } from '@/hooks/theme-store';
+import { DeviceEventEmitter, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -15,10 +17,20 @@ export default function TabLayout() {
     text: '#1F2937',
   };
 
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onStart(() => {
+        DeviceEventEmitter.emit('openAIAssistant');
+    })
+    .runOnJS(true);
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.primary,
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureDetector gesture={doubleTap}>
+        <View style={{ flex: 1 }}>
+          <Tabs
+            screenOptions={{
+              tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.tabBarBackground,
@@ -71,5 +83,8 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+        </View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 }

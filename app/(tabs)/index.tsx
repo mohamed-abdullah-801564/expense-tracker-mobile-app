@@ -10,16 +10,14 @@ import { AddExpenseSheet } from '@/components/AddExpenseSheet';
 import BudgetCard from '@/components/BudgetCard';
 import SetBudgetSheet from '@/components/SetBudgetSheet';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
-import { BudgetHistory } from '@/components/BudgetHistory';
 
 export default function ExpensesScreen() {
-  const { expenses, stats, isLoading, budgetHistory } = useExpenses();
+  const { expenses, stats, isLoading } = useExpenses();
   const { colors } = useTheme();
   const { isFirstTime, markGuideAsSeen, isLoading: isLoadingFirstTime } = useFirstTime();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showBudgetSheet, setShowBudgetSheet] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
 
   const styles = createStyles(colors);
 
@@ -54,12 +52,6 @@ export default function ExpensesScreen() {
           <Text style={styles.totalAmount}>₹{stats.total.toFixed(2)}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <TouchableOpacity
-            style={styles.historyButton}
-            onPress={() => setShowHistory(true)}
-          >
-            <History size={24} color={colors.text} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setShowAddSheet(true)}
@@ -120,17 +112,6 @@ export default function ExpensesScreen() {
           </View>
         </View>
       </Modal>
-
-      <Modal
-        visible={showHistory}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <BudgetHistory
-          transactions={budgetHistory}
-          onClose={() => setShowHistory(false)}
-        />
-      </Modal>
     </View>
   );
 }
@@ -176,16 +157,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
-  },
-  historyButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   listContent: {
     paddingVertical: 8,
