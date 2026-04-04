@@ -2,11 +2,13 @@ import { Tabs } from "expo-router";
 import { Wallet, History, Settings, Users } from "lucide-react-native";
 import React from "react";
 import { useTheme } from '@/hooks/theme-store';
-import { DeviceEventEmitter, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { View } from 'react-native';
+import { TapGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useExpenses } from '@/hooks/expense-store';
 
 export default function TabLayout() {
   const theme = useTheme();
+  const { toggleAiModal } = useExpenses();
   // Provide safe defaults in case theme or colors are undefined during initial render
   const colors = theme?.colors || {
     primary: '#4F46E5',
@@ -17,16 +19,18 @@ export default function TabLayout() {
     text: '#1F2937',
   };
 
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onStart(() => {
-        DeviceEventEmitter.emit('openAIAssistant');
-    })
-    .runOnJS(true);
+  const onHandlerStateChange = ({ nativeEvent }: any) => {
+    if (nativeEvent.state === State.ACTIVE) {
+        toggleAiModal();
+    }
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <GestureDetector gesture={doubleTap}>
+      <TapGestureHandler
+        numberOfTaps={2}
+        onHandlerStateChange={onHandlerStateChange}
+      >
         <View style={{ flex: 1 }}>
           <Tabs
             screenOptions={{
@@ -84,7 +88,7 @@ export default function TabLayout() {
       />
     </Tabs>
         </View>
-      </GestureDetector>
+      </TapGestureHandler>
     </GestureHandlerRootView>
   );
 }

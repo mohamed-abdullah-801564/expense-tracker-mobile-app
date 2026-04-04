@@ -11,7 +11,7 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import {
     Moon,
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
         setIsExporting(true);
         try {
             const data = await exportAllData();
-            if (data && data.expenses) {
+            if (data && data.expenses && Array.isArray(data.expenses)) {
                 let report = "EXPENSE REPORT\n----------------\n";
 
                 // Sort expenses by date (newest first)
@@ -115,12 +115,14 @@ export default function SettingsScreen() {
                 );
 
                 sortedExpenses.forEach((item: any) => {
+                    if (item.isDeleted) return;
                     const dateObj = new Date(item.date);
                     const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
                     report += `Item: ${item.description}\n`;
-                    report += `Amount: ₹${item.amount}\n`;
+                    report += `Amount: ₹${item.amount.toFixed(2)}\n`;
                     report += `Date: ${formattedDate}\n`;
+                    report += `Category: ${item.category}\n`;
                     report += "----------------\n";
                 });
 

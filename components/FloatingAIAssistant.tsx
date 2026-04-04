@@ -26,24 +26,13 @@ type ChatMessage = {
 };
 
 export function FloatingAIAssistant() {
-    const { allExpenses, budgetProgress, budgetHistory } = useExpenses();
+    const { allExpenses, budgetProgress, budgetHistory, isAiModalVisible: visible, toggleAiModal: setVisible } = useExpenses();
     const { friendSummaries } = useSplitExpenses();
     const { colors } = useTheme();
 
-    const [visible, setVisible] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
-    const hasApiKey = useMemo(
-        () => typeof process.env.EXPO_PUBLIC_GEMINI_API_KEY === 'string' && !!process.env.EXPO_PUBLIC_GEMINI_API_KEY,
-        []
-    );
-
-    useEffect(() => {
-        const sub = DeviceEventEmitter.addListener('openAIAssistant', () => setVisible(true));
-        return () => sub.remove();
-    }, []);
 
     useEffect(() => {
         setMessages((prev) => {
@@ -51,23 +40,14 @@ export function FloatingAIAssistant() {
                 return prev;
             }
 
-            if (hasApiKey) {
-                return [
-                    {
-                        role: 'ai',
-                        text: "👋 Hi! I'm your financial AI. I have successfully connected to your Gemini API key! Ask me anything about your expenses or budget.",
-                    },
-                ];
-            }
-
             return [
                 {
                     role: 'ai',
-                    text: '⚠️ Error: I cannot find your EXPO_PUBLIC_GEMINI_API_KEY in the .env file. Please add it and restart the server.',
+                    text: "👋 Hi! I'm your financial AI. Ask me anything about your expenses or budget.",
                 },
             ];
         });
-    }, [hasApiKey]);
+    }, []);
 
     const handleSend = useCallback(async () => {
         const trimmed = input.trim();
@@ -100,7 +80,7 @@ export function FloatingAIAssistant() {
                 visible={visible}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={() => setVisible(false)}
+                onRequestClose={() => setVisible()}
             >
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
@@ -112,7 +92,7 @@ export function FloatingAIAssistant() {
                                     AI Financial Assistant
                                 </Text>
                             </View>
-                            <TouchableOpacity onPress={() => setVisible(false)} style={styles.closeButton}>
+                            <TouchableOpacity onPress={() => setVisible()} style={styles.closeButton}>
                                 <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>Close</Text>
                             </TouchableOpacity>
                         </View>

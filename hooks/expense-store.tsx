@@ -134,6 +134,7 @@ function useCreateExpenseContext() {
     const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null);
     const [budget, setBudget] = useState<Budget | null>(null);
     const [budgetHistory, setBudgetHistory] = useState<BudgetTransaction[]>([]);
+    const [isAiModalVisible, setIsAiModalVisible] = useState(false);
 
     // Initialize storage validation on first load
     useEffect(() => {
@@ -345,16 +346,7 @@ function useCreateExpenseContext() {
     // Data export/import functions
     const exportAllData = useCallback(async () => {
         const data = await StorageUtils.exportData();
-        if (!data) return null;
-        let text = '=== EXPORTED EXPENSES ===\n\n';
-        if (data.expenses && Array.isArray(data.expenses)) {
-            data.expenses.forEach((e: Expense) => {
-                if (!e.isDeleted) {
-                    text += `Date: ${e.date}\nDescription: ${e.description}\nAmount: ₹${e.amount.toFixed(2)}\nCategory: ${e.category}\n\n`;
-                }
-            });
-        }
-        return text;
+        return data;
     }, []);
 
     const importAllData = useCallback(async (data: any) => {
@@ -460,6 +452,8 @@ function useCreateExpenseContext() {
         clearBudget,
         budgetHistory,
         clearBudgetHistory,
+        isAiModalVisible,
+        toggleAiModal: useCallback(() => setIsAiModalVisible(prev => !prev), []),
         exportAllData,
         importAllData,
         createBackup,
