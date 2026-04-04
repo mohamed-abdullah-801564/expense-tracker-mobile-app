@@ -43,7 +43,7 @@ export function FloatingAIAssistant() {
             return [
                 {
                     role: 'ai',
-                    text: "👋 Hi! I'm your financial AI. Ask me anything about your expenses or budget.",
+                    text: "👋 Hi! I'm your financial AI. Ask me anything about your financial budget and expense.",
                 },
             ];
         });

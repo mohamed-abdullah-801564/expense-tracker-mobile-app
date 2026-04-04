@@ -24,6 +24,7 @@ export async function askGeminiAssistant(prompt: string, contextData: any): Prom
             body: JSON.stringify({
                 prompt,
                 contextData,
+                model: 'gemini-2.5-flash',
                 // Including system instruction update as requested, 
                 // assuming the proxy might use it or it's for documentation.
                 systemInstruction: 'You are a read-only financial advisor for an expense tracker app. You CANNOT add, delete, or modify expenses. The user will provide their current financial data (expenses, budget, budgetHistory, debts) in JSON format. Your ONLY job is to analyze this data and answer questions. You now have access to the user\'s budgetHistory to provide better insights. Be conversational, helpful, concise, and natural. Do not use markdown code blocks, reply in plain text.'
@@ -31,14 +32,17 @@ export async function askGeminiAssistant(prompt: string, contextData: any): Prom
         });
 
         if (!response.ok) {
-            throw new Error(`Proxy error: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Proxy error: ${response.status}`);
         }
 
-        const text = await response.text();
-        return text;
-    } catch (error) {
+        const data = await response.json();
+        return data.text || 'The AI assistant returned an empty response.';
+    } catch (error: any) {
         console.error('Error calling AI assistant:', error);
-        return 'Sorry, I could not reach the AI assistant right now. Please try again in a moment.';
+        return error.message.includes('Proxy error') 
+            ? 'Sorry, I could not reach the AI assistant right now. Please check your backend configuration.'
+            : `Error: ${error.message}`;
     }
 }
 
