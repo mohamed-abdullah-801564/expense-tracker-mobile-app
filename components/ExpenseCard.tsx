@@ -55,9 +55,9 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                     {expense.description}
                 </Text>
 
-                {(expense.shared_amount || expense.paid_to || expense.note) && (
+                {(!!expense.shared_amount || !!expense.paid_to || !!expense.note) && (
                     <View style={styles.extraInfo}>
-                        {expense.shared_amount && (
+                        {!!expense.shared_amount && (
                             <View style={styles.sharedInfo}>
                                 <LucideIcons.Users size={12} color="#10B981" />
 ...

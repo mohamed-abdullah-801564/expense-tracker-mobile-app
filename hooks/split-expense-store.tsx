@@ -9,7 +9,7 @@ const SPLIT_EXPENSES_KEY = 'split_expenses';
 const normalizeName = (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return '';
-    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };
 
 function useCreateSplitExpenseContext() {
