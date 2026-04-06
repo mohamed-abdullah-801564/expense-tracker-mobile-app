@@ -36,8 +36,45 @@ LogBox.ignoreLogs([
   'functionality is not fully supported in Expo Go',
 ]);
 
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect, useState } from 'react';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might cause this to error */
+});
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [appIsReady, setAppIsReady] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        // Pre-load fonts, make any API calls you need to do here
+        // For now, we just simulate a small delay or wait for context to be ready
+        // In a real app, you might use useFonts here.
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        // Tell the application to render
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
+  }, []);
+
+  useEffect(() => {
+    if (appIsReady) {
+      // This tells the splash screen to hide immediately! If we need a delay, we could do it here.
+      SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  if (!appIsReady) {
+    return null;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

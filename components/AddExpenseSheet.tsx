@@ -17,7 +17,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { parseExpenseWithAI, validateAmount } from '@/utils/expense-parser';
-import { parseSplitExpense, createSplitExpenses, parseDebt } from '@/utils/split-expense-parser';
+import { parseSplitExpense, createSplitExpenses, parseDebt, ParsedSplitWithNames } from '@/utils/split-expense-parser';
 import { SplitExpense } from '@/types/expense';
 
 
@@ -93,43 +93,53 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             const expenseDate = new Date().toISOString();
             const expenseId = Date.now().toString();
 
-            const splitData = parseSplitExpense(input);
+            let splitData: ParsedSplitWithNames | null = null;
+            try {
+                splitData = parseSplitExpense(input);
+            } catch (e) {
+                console.error('Split parser failed:', e);
+            }
+
             let userAmount = parsed.amount;
 
             if (splitData) {
-                // If it's a split expense, the user's personal expense is only their share.
-                // splitData.amountPerPerson is the amount EACH person pays (including user).
-                // However, splitData usually calculates this as total / count.
-                // We should ensure we subtract what OTHERS owe.
-
-                // Total Amount - (Friends Count * Amount Per Person) = User's Share
-                // OR simply Amount Per Person if it divides evenly.
-                // Let's rely on the splitData logic which mirrors the split parser.
-
-                const totalFriendsShare = splitData.amountPerPerson * (splitData.splitCount - 1);
-                userAmount = parsed.amount - totalFriendsShare;
+                try {
+                    const totalFriendsShare = splitData.amountPerPerson * (splitData.splitCount - 1);
+                    userAmount = parsed.amount - totalFriendsShare;
+                } catch (e) {
+                    console.error('Calculation share failed:', e);
+                    splitData = null; // Revert to normal expense if share calc fails
+                }
             }
 
             addExpense({
                 ...parsed,
-                amount: userAmount, // Use the user's share for their personal tracking
+                amount: userAmount, 
                 date: expenseDate,
             });
 
             if (splitData) {
-                const splits = createSplitExpenses(splitData, expenseId, expenseDate, splitData.friendNames);
-                addSplitExpenses(splits);
-                Alert.alert(
-                    'Split Expense Added',
-                    `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ₹${splitData.amountPerPerson.toFixed(2)} each.`,
-                    [{ text: 'OK' }]
-                );
+                try {
+                    const splits = createSplitExpenses(splitData, expenseId, expenseDate, splitData.friendNames);
+                    addSplitExpenses(splits);
+                    Alert.alert(
+                        'Split Expense Added',
+                        `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ₹${splitData.amountPerPerson.toFixed(2)} each.`,
+                        [{ text: 'OK' }]
+                    );
+                } catch (e) {
+                    console.error('Add split expenses failed:', e);
+                    Alert.alert('Partially Saved', 'Main expense saved, but failed to record the splits.');
+                }
             }
 
             setInput('');
             onClose();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to parse expense. Please try again.');
+        } catch (error: any) {
+            let errorMessage = 'Failed to parse expense. Please try again.';
+            if (error?.message) errorMessage = error.message;
+            
+            Alert.alert('Parsing Error', errorMessage);
             console.error('Error parsing expense:', error);
         } finally {
             setIsParsing(false);

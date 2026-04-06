@@ -59,31 +59,63 @@ export function parseSplitExpense(input: string): ParsedSplitWithNames | null {
 
 function extractFriendNames(input: string, splitCount: number): string[] {
     const names: string[] = [];
+    const lowerInput = input.toLowerCase();
 
-    const withPattern = /split\s+(?:with|between)?\s*([^\d][^,;]+?)(?:,|;|\s+and\s+|$)/gi;
-    let match;
-
-    while ((match = withPattern.exec(input)) !== null) {
-        const nameGroup = match[1].trim();
-        if (nameGroup && !nameGroup.match(/^\d+\s*(person|people)?$/i)) {
-            const individualNames = nameGroup.split(/\s+and\s+|,\s*/gi)
-                .map(n => n.trim())
-                .filter(n => n.length > 0 && !n.match(/^\d+$/));
-            names.push(...individualNames);
+    // Strategy 1: Look for names after "with", "between", "among"
+    // Match "split [number] with/between/among [Names]" or "[Names] split [number]"
+    // We target the part of the string that mentions names
+    const nameMarkers = ['with', 'between', 'among', 'and me and', 'and myself and'];
+    
+    let namesPart = '';
+    
+    // Check if any marker exists
+    for (const marker of nameMarkers) {
+        const index = lowerInput.lastIndexOf(marker);
+        if (index !== -1) {
+            // Take everything after the marker
+            namesPart = input.slice(index + marker.length).trim();
+            break;
         }
     }
 
-    const personPattern = /split\s+\d+\s+(?:person|people)?\s*:?\s*([^$]+)/i;
-    const personMatch = input.match(personPattern);
-    if (personMatch && names.length === 0) {
-        const namesList = personMatch[1].trim();
-        const extractedNames = namesList.split(/[,;]|\s+and\s+/gi)
-            .map(n => n.trim())
-            .filter(n => n.length > 0 && !n.match(/^\d+$/));
-        names.push(...extractedNames);
+    // Special case for "between me and Alex"
+    if (!namesPart && lowerInput.includes('between me and')) {
+        const index = lowerInput.indexOf('between me and');
+        namesPart = input.slice(index + 'between me and'.length).trim();
     }
 
-    return names.slice(0, splitCount - 1);
+    if (namesPart) {
+        // Clean up: remove amount or split count if they somehow ended up here
+        const cleanedPart = namesPart.split(/\s+split\s+|\s+\d+/i)[0].trim();
+        
+        const individualNames = cleanedPart.split(/[,;&]|\s+and\s+/gi)
+            .map(n => n.trim())
+            .filter(n => n.length > 0 && 
+                         !n.match(/^\d+$/) && 
+                         !['me', 'myself', 'i'].includes(n.toLowerCase()));
+        
+        names.push(...individualNames);
+    }
+
+    // Strategy 2: Fallback to old patterns if Strategy 1 found nothing
+    if (names.length === 0) {
+        const withPattern = /split\s+(?:with|between|among)?\s*([^\d][^,;]+?)(?:,|;|\s+and\s+|$)/gi;
+        let match;
+        while ((match = withPattern.exec(input)) !== null) {
+            const nameGroup = match[1].trim();
+            if (nameGroup && !nameGroup.match(/^\d+\s*(person|people)?$/i)) {
+                const individualNames = nameGroup.split(/\s+and\s+|,\s*/gi)
+                    .map(n => n.trim())
+                    .filter(n => n.length > 0 && !n.match(/^\d+$/) && !['me', 'i'].includes(n.toLowerCase()));
+                names.push(...individualNames);
+            }
+        }
+    }
+
+    // Deduplicate and filter
+    const uniqueNames = Array.from(new Set(names));
+    
+    return uniqueNames.slice(0, splitCount - 1);
 }
 
 export function createSplitExpenses(

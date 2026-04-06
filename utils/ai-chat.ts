@@ -5,7 +5,7 @@ const COOLDOWN_MS = 10000;
 export async function askGeminiAssistant(prompt: string, contextData: any): Promise<string> {
     const now = Date.now();
     if (now - lastRequestTime < COOLDOWN_MS) {
-        return 'Please wait a moment before asking another question to avoid hitting rate limits.';
+        return "Whoa, slow down! ☕ I'm still processing your last thought. Give me a few seconds to catch up, and I'll be ready to help you again!";
     }
 
     const proxyUrl = process.env.EXPO_PUBLIC_PROXY_URL;
