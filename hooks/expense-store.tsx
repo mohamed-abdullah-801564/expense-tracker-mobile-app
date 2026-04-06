@@ -8,6 +8,7 @@ const STORAGE_KEY = 'expenses';
 const BUDGET_STORAGE_KEY = 'budget';
 const BUDGET_HISTORY_STORAGE_KEY = 'budget_history';
 const BACKUP_STORAGE_KEY = 'expense_backup';
+const EXPENSES_COUNT_KEY = 'total_expenses_added';
 const STORAGE_VERSION_KEY = 'storage_version';
 const CURRENT_STORAGE_VERSION = '1.0';
 
@@ -134,11 +135,18 @@ function useCreateExpenseContext() {
     const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null);
     const [budget, setBudget] = useState<Budget | null>(null);
     const [budgetHistory, setBudgetHistory] = useState<BudgetTransaction[]>([]);
+    const [totalExpensesAdded, setTotalExpensesAdded] = useState<number>(0);
     const [isAiModalVisible, setIsAiModalVisible] = useState(false);
+    const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
 
     // Initialize storage validation on first load
     useEffect(() => {
         StorageUtils.validateAndMigrate();
+        const loadCount = async () => {
+            const count = await StorageUtils.safeGet(EXPENSES_COUNT_KEY, 0);
+            setTotalExpensesAdded(count);
+        };
+        loadCount();
     }, []);
 
     // Load expenses from AsyncStorage with enhanced error handling
@@ -267,7 +275,16 @@ function useCreateExpenseContext() {
         const updated = [newExpense, ...expenses];
         setExpenses(updated);
         saveExpenses(updated);
-    }, [expenses, saveExpenses]);
+
+        // Increment and check milestones
+        const newCount = totalExpensesAdded + 1;
+        setTotalExpensesAdded(newCount);
+        StorageUtils.safeSet(EXPENSES_COUNT_KEY, newCount);
+
+        if (newCount === 5 || newCount === 10 || (newCount > 10 && newCount % 10 === 0)) {
+            setIsFeedbackModalVisible(true);
+        }
+    }, [expenses, saveExpenses, totalExpensesAdded]);
 
     const deleteExpense = useCallback((id: string) => {
         const updated = expenses.map(e =>
@@ -454,6 +471,9 @@ function useCreateExpenseContext() {
         clearBudgetHistory,
         isAiModalVisible,
         toggleAiModal: useCallback(() => setIsAiModalVisible(prev => !prev), []),
+        isFeedbackModalVisible,
+        setFeedbackModalVisible: setIsFeedbackModalVisible,
+        totalExpensesAdded,
         exportAllData,
         importAllData,
         createBackup,

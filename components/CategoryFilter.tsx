@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/categories';
-import { Utensils, Car, Home, Music, ShoppingBag, Heart, MoreHorizontal } from 'lucide-react-native';
+import * as LucideIcons from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 
@@ -34,16 +34,7 @@ export default function CategoryFilter() {
             </TouchableOpacity>
 
             {CATEGORIES.map((category) => {
-                const iconMap: Record<string, React.ComponentType<any>> = {
-                    Utensils,
-                    Car,
-                    Home,
-                    Music,
-                    ShoppingBag,
-                    Heart,
-                    MoreHorizontal,
-                };
-                const IconComponent = iconMap[CATEGORY_ICONS[category]];
+                const IconComponent = LucideIcons[CATEGORY_ICONS[category] as keyof typeof LucideIcons] as React.ComponentType<any>;
                 const isActive = selectedCategory === category;
 
                 return (

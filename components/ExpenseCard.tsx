@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Expense } from '@/types/expense';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/categories';
-import { Utensils, Car, Home, Music, ShoppingBag, Heart, MoreHorizontal, Users, ArrowRight } from 'lucide-react-native';
+import * as LucideIcons from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 
@@ -14,16 +14,7 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
     const { deleteExpense } = useExpenses();
     const { colors } = useTheme();
     const styles = createStyles(colors);
-    const iconMap: Record<string, React.ComponentType<any>> = {
-        Utensils,
-        Car,
-        Home,
-        Music,
-        ShoppingBag,
-        Heart,
-        MoreHorizontal,
-    };
-    const IconComponent = iconMap[CATEGORY_ICONS[expense.category]];
+    const IconComponent = LucideIcons[CATEGORY_ICONS[expense.category] as keyof typeof LucideIcons] as React.ComponentType<any>;
 
     const handleDelete = () => {
         Alert.alert(
@@ -68,13 +59,9 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                     <View style={styles.extraInfo}>
                         {expense.shared_amount && (
                             <View style={styles.sharedInfo}>
-                                <Users size={12} color="#10B981" />
-                                <Text style={styles.sharedText}>Split: ₹{expense.shared_amount}</Text>
-                            </View>
-                        )}
-                        {expense.paid_to && (
-                            <View style={styles.paymentInfo}>
-                                <ArrowRight size={12} color="#F59E0B" />
+                                <LucideIcons.Users size={12} color="#10B981" />
+...
+                                <LucideIcons.ArrowRight size={12} color="#F59E0B" />
                                 <Text style={styles.paymentText}>Paid to {expense.paid_to}</Text>
                             </View>
                         )}

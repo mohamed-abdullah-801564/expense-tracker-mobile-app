@@ -18,7 +18,7 @@ export async function parseExpenseWithAI(input: string): Promise<ParsedExpense> 
         
 1. Extract the expense amount as a number.
 2. Extract the expense description or item name clearly.
-3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, or Other.
+3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, or Other.
 4. If the expense input contains time or part of the day (like '5 PM', 'morning'), extract it as 'time'. If not present, omit the time field.
 5. Extract details about shared expenses or payments:
    - If the user mentions splitting the expense, extract the shared amount and indicate it's split.
@@ -142,6 +142,8 @@ function fallbackParser(input: string): ParsedExpense {
         category = 'Shopping';
     } else if (lowerInput.includes('doctor') || lowerInput.includes('medicine') || lowerInput.includes('hospital')) {
         category = 'Health';
+    } else if (lowerInput.includes('tea') || lowerInput.includes('coffee') || lowerInput.includes('bun') || lowerInput.includes('samosa') || lowerInput.includes('biscuits') || lowerInput.includes('chai')) {
+        category = 'Snacks';
     }
 
     return { amount, description, category, ...(time && { time }) };

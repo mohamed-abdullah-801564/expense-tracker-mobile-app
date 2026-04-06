@@ -19,6 +19,7 @@ import {
     PieChart,
     AlertCircle,
     DollarSign,
+    Bot,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
 
@@ -118,15 +119,25 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
             ],
         },
         {
-            icon: <Settings size={28} color={colors.textSecondary} />,
-            title: 'Settings & Features',
-            description: 'Customize your experience and manage your data.',
+            icon: <PieChart size={28} color={colors.primary} />,
+            title: 'Spending Insights',
+            description: 'Visualize your spending habits with the new Insights tab.',
             steps: [
-                'Toggle dark/light mode for comfortable viewing',
-                'Add recurring bills for automatic reminders',
-                'Export your data for backup',
-                'View storage statistics',
-                'Clear all data if needed',
+                'View a Donut Chart of your monthly spending',
+                'See category breakdown with percentages and totals',
+                'Toggle between months to compare spending',
+                'Track progress bars for each category',
+            ],
+        },
+        {
+            icon: <Bot size={28} color={colors.primary} />,
+            title: 'AI Financial Assistant',
+            description: 'Get personalized insights and help with your finances.',
+            steps: [
+                'Double-tap anywhere on the screen to trigger the AI',
+                'Ask about your spending distribution: "How much did I spend on Snacks?"',
+                'Get help with budgeting and financial goals',
+                'Analyze your budget history through conversational AI',
             ],
         },
         {
@@ -134,12 +145,12 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
             title: 'Quick Tips',
             description: 'Get the most out of your expense tracker.',
             steps: [
-                'Use natural language: "Coffee 80 food" works perfectly',
-                'Split bills automatically: "Movie 1200 split 3 person"',
+                'Use natural language: "Coffee 80 snacks" or "Tea 20" works perfectly',
+                'Double-tap to quickly chat with your AI assistant',
+                'View Budget History and transactions in the History tab',
+                'Use the "Snacks" category for daily small expenses like tea/chai',
                 'Set realistic budgets to avoid overspending',
-                'Check History regularly to understand spending patterns',
-                'Enable notifications to stay within budget',
-                'Your data is saved automatically and persists',
+                'Check Insights regularly to understand spending patterns',
             ],
         },
     ];

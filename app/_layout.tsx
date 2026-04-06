@@ -12,6 +12,18 @@ import { ExpenseProvider } from '@/hooks/expense-store';
 import { SplitExpenseProvider } from '@/hooks/split-expense-store';
 import { FirstTimeProvider } from '@/hooks/first-time-store';
 import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
+import FeedbackModal from '@/components/FeedbackModal';
+import { useExpenses } from '@/hooks/expense-store';
+
+function GlobalModals() {
+  const { isFeedbackModalVisible, setFeedbackModalVisible } = useExpenses();
+  return (
+    <FeedbackModal 
+      visible={isFeedbackModalVisible} 
+      onClose={() => setFeedbackModalVisible(false)} 
+    />
+  );
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -41,6 +53,7 @@ export default function RootLayout() {
                   </Stack>
                   <StatusBar style="auto" />
                   <FloatingAIAssistant />
+                  <GlobalModals />
                 </FirstTimeProvider>
               </SplitExpenseProvider>
             </NotificationProvider>

@@ -11,7 +11,7 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {
     Moon,
@@ -24,7 +24,8 @@ import {
     Download,
     Database,
     Shield,
-    HelpCircle
+    HelpCircle,
+    Star
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
 import { useNotifications } from '@/hooks/notification-store';
@@ -49,7 +50,8 @@ export default function SettingsScreen() {
         budget,
         budgetHistory,
         exportAllData,
-        createBackup
+        createBackup,
+        setFeedbackModalVisible
     } = useExpenses();
 
     const [showAddBill, setShowAddBill] = useState<boolean>(false);
@@ -352,6 +354,16 @@ export default function SettingsScreen() {
                             <Text style={styles.dataButtonText}>
                                 {isCreatingBackup ? 'Creating Backup...' : 'Create Backup'}
                             </Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.dataButton}
+                        onPress={() => setFeedbackModalVisible(true)}
+                    >
+                        <View style={styles.settingLeft}>
+                            <Star size={20} color={colors.primary} />
+                            <Text style={styles.dataButtonText}>Give Feedback</Text>
                         </View>
                     </TouchableOpacity>
 

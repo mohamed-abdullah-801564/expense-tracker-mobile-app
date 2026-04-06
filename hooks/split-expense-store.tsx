@@ -6,6 +6,12 @@ import { SplitExpense, FriendSummary } from '@/types/expense';
 
 const SPLIT_EXPENSES_KEY = 'split_expenses';
 
+const normalizeName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+
 function useCreateSplitExpenseContext() {
     const queryClient = useQueryClient();
     const [splitExpenses, setSplitExpenses] = useState<SplitExpense[]>([]);
@@ -51,7 +57,11 @@ function useCreateSplitExpenseContext() {
     }, [splitExpensesQuery.data]);
 
     const addSplitExpenses = useCallback((splits: SplitExpense[]) => {
-        const updated = [...splits, ...splitExpenses];
+        const normalizedSplits = splits.map(split => ({
+            ...split,
+            friendName: normalizeName(split.friendName)
+        }));
+        const updated = [...normalizedSplits, ...splitExpenses];
         setSplitExpenses(updated);
         saveSplitExpenses(updated);
     }, [splitExpenses, saveSplitExpenses]);
@@ -71,8 +81,9 @@ function useCreateSplitExpenseContext() {
     }, [splitExpenses, saveSplitExpenses]);
 
     const updateFriendName = useCallback((oldName: string, newName: string) => {
+        const normalizedNewName = normalizeName(newName);
         const updated = splitExpenses.map(split =>
-            split.friendName === oldName ? { ...split, friendName: newName } : split
+            split.friendName === oldName ? { ...split, friendName: normalizedNewName } : split
         );
         setSplitExpenses(updated);
         saveSplitExpenses(updated);

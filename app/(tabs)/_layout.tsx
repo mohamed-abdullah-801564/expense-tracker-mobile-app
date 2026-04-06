@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Wallet, History, Settings, Users } from "lucide-react-native";
+import { Wallet, History, Settings, Users, PieChart } from "lucide-react-native";
 import React from "react";
 import { useTheme } from '@/hooks/theme-store';
 import { View } from 'react-native';
@@ -70,6 +70,13 @@ export default function TabLayout() {
         options={{
           title: "History",
           tabBarIcon: ({ color }) => <History size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: "Insights",
+          tabBarIcon: ({ color }) => <PieChart size={24} color={color} />,
         }}
       />
       <Tabs.Screen
