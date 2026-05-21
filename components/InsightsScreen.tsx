@@ -146,7 +146,7 @@ export default function InsightsScreen() {
                 </View>
                 
                 <View style={styles.legendContainer}>
-                    {stats.items.slice(0, 5).map((stat) => (
+                    {stats.items.map((stat) => (
                         <View key={stat.category} style={styles.legendItem}>
                             <View style={[styles.legendDot, { backgroundColor: stat.color }]} />
                             <Text style={[styles.legendText, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -318,12 +318,12 @@ const styles = StyleSheet.create({
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
     },
     legendDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
     },
     legendText: {
         fontSize: 12,

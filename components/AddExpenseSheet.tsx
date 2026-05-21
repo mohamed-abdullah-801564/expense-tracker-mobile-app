@@ -154,7 +154,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             onRequestClose={onClose}
         >
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >

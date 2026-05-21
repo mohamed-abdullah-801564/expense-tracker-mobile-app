@@ -14,7 +14,10 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
     const { deleteExpense } = useExpenses();
     const { colors } = useTheme();
     const styles = createStyles(colors);
-    const IconComponent = LucideIcons[CATEGORY_ICONS[expense.category] as keyof typeof LucideIcons] as React.ComponentType<any>;
+    
+    const iconName = CATEGORY_ICONS[expense.category] || CATEGORY_ICONS['Other'];
+    const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as React.ComponentType<any>;
+    const categoryColor = CATEGORY_COLORS[expense.category] || CATEGORY_COLORS['Other'];
 
     const handleDelete = () => {
         Alert.alert(
@@ -46,8 +49,8 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
             onLongPress={handleDelete}
             activeOpacity={0.7}
         >
-            <View style={[styles.iconContainer, { backgroundColor: CATEGORY_COLORS[expense.category] + '20' }]}>
-                <IconComponent size={24} color={CATEGORY_COLORS[expense.category]} />
+            <View style={[styles.iconContainer, { backgroundColor: categoryColor + '20' }]}>
+                <IconComponent size={24} color={categoryColor} />
             </View>
 
             <View style={styles.content}>
@@ -60,7 +63,7 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                         {!!expense.shared_amount && (
                             <View style={styles.sharedInfo}>
                                 <LucideIcons.Users size={12} color="#10B981" />
-...
+                                <Text style={styles.sharedText}>{expense.shared_amount.toFixed(2)} shared</Text>
                                 <LucideIcons.ArrowRight size={12} color="#F59E0B" />
                                 <Text style={styles.paymentText}>Paid to {expense.paid_to}</Text>
                             </View>
@@ -72,7 +75,7 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                 )}
 
                 <View style={styles.metaContainer}>
-                    <Text style={[styles.category, { color: CATEGORY_COLORS[expense.category] }]}>
+                    <Text style={[styles.category, { color: categoryColor }]}>
                         {expense.category}
                     </Text>
                     <Text style={styles.date}>{formatDate(expense.date)}</Text>

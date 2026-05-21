@@ -10,6 +10,7 @@ import {
     Modal,
     TextInput,
     Alert,
+    Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -105,6 +106,54 @@ export default function SettingsScreen() {
     };
 
     const handleExportData = async () => {
+        if (Platform.OS === 'web') {
+            setIsExporting(true);
+            try {
+                const data = await exportAllData();
+                if (data && data.expenses && Array.isArray(data.expenses)) {
+                    let report = "EXPENSE REPORT\n----------------\n";
+
+                    // Sort expenses by date (newest first)
+                    const sortedExpenses = [...data.expenses].sort((a, b) =>
+                        new Date(b.date).getTime() - new Date(a.date).getTime()
+                    );
+
+                    sortedExpenses.forEach((item: any) => {
+                        if (item.isDeleted) return;
+                        const dateObj = new Date(item.date);
+                        const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+
+                        report += `Item: ${item.description}\n`;
+                        report += `Amount: ₹${item.amount.toFixed(2)}\n`;
+                        report += `Date: ${formattedDate}\n`;
+                        report += `Category: ${item.category}\n`;
+                        report += "----------------\n";
+                    });
+
+                    // Web download fallback
+                    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'expenses-report.txt';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    Alert.alert('Success', 'Expense report downloaded successfully!');
+                } else {
+                    Alert.alert('Export Failed', 'No data to export.');
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                Alert.alert('Export Failed', 'An error occurred while exporting data.');
+            } finally {
+                setIsExporting(false);
+            }
+            return;
+        }
+
         setIsExporting(true);
         try {
             const data = await exportAllData();

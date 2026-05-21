@@ -31,7 +31,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
             const parsed = await parseBudgetWithAI(input);
 
             const validation = validateAmount(parsed.budget_amount);
-            if (!validation.valid) {
+            if (!validation.valid || isNaN(parsed.budget_amount) || parsed.budget_amount <= 0) {
                 Alert.alert('Invalid Amount', validation.error || 'Please enter a valid budget amount');
                 setIsLoading(false);
                 return;

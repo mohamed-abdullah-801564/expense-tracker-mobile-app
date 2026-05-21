@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Expense, ExpenseCategory, CategoryStats, Budget, BudgetTransaction } from '@/types/expense';
+import { CATEGORIES } from '@/constants/categories';
 
 const STORAGE_KEY = 'expenses';
 const BUDGET_STORAGE_KEY = 'budget';
@@ -153,7 +154,13 @@ function useCreateExpenseContext() {
     const expensesQuery = useQuery({
         queryKey: ['expenses'],
         queryFn: async () => {
-            const expenses = await StorageUtils.safeGet(STORAGE_KEY, []);
+            let expenses = await StorageUtils.safeGet(STORAGE_KEY, []);
+            expenses = expenses.map((expense: any) => {
+                if (!CATEGORIES.includes(expense.category)) {
+                    return { ...expense, category: 'Other' };
+                }
+                return expense;
+            });
             console.log(`Loaded ${expenses.length} expenses from storage`);
             return expenses;
         },

@@ -1,4 +1,5 @@
 import { ParsedExpense } from '@/types/expense';
+import { CATEGORIES } from '@/constants/categories';
 
 export const MAX_AMOUNT = 1000000;
 export const MIN_AMOUNT = 0.01;
@@ -18,7 +19,9 @@ export async function parseExpenseWithAI(input: string): Promise<ParsedExpense> 
         
 1. Extract the expense amount as a number.
 2. Extract the expense description or item name clearly.
-3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, or Other.
+3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, Drinks, or Other.
+   - For hot beverages (e.g., tea, coffee, chai, boost) and small food items, classify as 'Snacks'.
+   - For cold beverages (e.g., water, juice, soda, milkshakes, cool drinks), classify as 'Drinks'.
 4. If the expense input contains time or part of the day (like '5 PM', 'morning'), extract it as 'time'. If not present, omit the time field.
 5. Extract details about shared expenses or payments:
    - If the user mentions splitting the expense, extract the shared amount and indicate it's split.
@@ -89,10 +92,15 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
             throw new Error(validation.error);
         }
 
+        let parsedCategory = parsed.category as ParsedExpense['category'];
+        if (!CATEGORIES.includes(parsedCategory)) {
+            parsedCategory = 'Other';
+        }
+
         return {
             amount: parsed.amount,
             description: parsed.description,
-            category: parsed.category as ParsedExpense['category'],
+            category: parsedCategory,
             ...(parsed.time && { time: parsed.time }),
             ...(parsed.shared_amount && { shared_amount: parsed.shared_amount }),
             ...(parsed.paid_to && { paid_to: parsed.paid_to }),
@@ -130,11 +138,11 @@ function fallbackParser(input: string): ParsedExpense {
     const lowerInput = input.toLowerCase();
     let category: ParsedExpense['category'] = 'Other';
 
-    if (lowerInput.includes('food') || lowerInput.includes('lunch') || lowerInput.includes('dinner') || lowerInput.includes('coffee') || lowerInput.includes('breakfast')) {
+    if (lowerInput.includes('food') || lowerInput.includes('lunch') || lowerInput.includes('dinner') || lowerInput.includes('breakfast')) {
         category = 'Food';
     } else if (lowerInput.includes('bus') || lowerInput.includes('taxi') || lowerInput.includes('uber') || lowerInput.includes('transport') || lowerInput.includes('fuel')) {
         category = 'Transport';
-    } else if (lowerInput.includes('electricity') || lowerInput.includes('water') || lowerInput.includes('gas') || lowerInput.includes('internet') || lowerInput.includes('rent')) {
+    } else if (lowerInput.includes('electricity') || lowerInput.includes('gas') || lowerInput.includes('internet') || lowerInput.includes('rent')) {
         category = 'Utilities';
     } else if (lowerInput.includes('movie') || lowerInput.includes('game') || lowerInput.includes('entertainment')) {
         category = 'Entertainment';
@@ -142,8 +150,10 @@ function fallbackParser(input: string): ParsedExpense {
         category = 'Shopping';
     } else if (lowerInput.includes('doctor') || lowerInput.includes('medicine') || lowerInput.includes('hospital')) {
         category = 'Health';
-    } else if (lowerInput.includes('tea') || lowerInput.includes('coffee') || lowerInput.includes('bun') || lowerInput.includes('samosa') || lowerInput.includes('biscuits') || lowerInput.includes('chai')) {
+    } else if (lowerInput.includes('tea') || lowerInput.includes('coffee') || lowerInput.includes('chai') || lowerInput.includes('boost') || lowerInput.includes('bun') || lowerInput.includes('samosa') || lowerInput.includes('biscuits')) {
         category = 'Snacks';
+    } else if (lowerInput.includes('water') || lowerInput.includes('juice') || lowerInput.includes('soda') || lowerInput.includes('milkshake') || lowerInput.includes('drink') || lowerInput.includes('cool')) {
+        category = 'Drinks';
     }
 
     return { amount, description, category, ...(time && { time }) };

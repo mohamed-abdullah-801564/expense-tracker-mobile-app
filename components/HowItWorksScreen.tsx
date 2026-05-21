@@ -148,7 +148,7 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
                 'Use natural language: "Coffee 80 snacks" or "Tea 20" works perfectly',
                 'Double-tap to quickly chat with your AI assistant',
                 'View Budget History and transactions in the History tab',
-                'Use the "Snacks" category for daily small expenses like tea/chai',
+                'Use "Snacks" for hot items (tea/coffee) and "Drinks" for cold items (water/juice/soda).',
                 'Set realistic budgets to avoid overspending',
                 'Check Insights regularly to understand spending patterns',
             ],

@@ -26,6 +26,10 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "translucent": true
+    },
     "plugins": [
       "expo-router",
       [
@@ -33,8 +37,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#7C3AED"
+          "resizeMode": "cover"
         }
       ]
     ],

@@ -67,7 +67,13 @@ export function FloatingAIAssistant() {
             };
 
             const aiResponse = await askGeminiAssistant(trimmed, contextData);
-            const aiMessage: ChatMessage = { role: 'ai', text: aiResponse };
+            
+            let finalResponse = aiResponse;
+            if (!finalResponse || finalResponse.trim() === '') {
+                finalResponse = "Sorry, I couldn't understand that.";
+            }
+            
+            const aiMessage: ChatMessage = { role: 'ai', text: finalResponse };
             setMessages((prev) => [...prev, aiMessage]);
         } finally {
             setIsLoading(false);

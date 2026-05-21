@@ -161,7 +161,8 @@ export default function HistoryScreen() {
             <Modal
                 visible={showHistory}
                 animationType="slide"
-                presentationStyle="pageSheet"
+                transparent={true}
+                onRequestClose={() => setShowHistory(false)}
             >
                 <BudgetHistory
                     transactions={budgetHistory}

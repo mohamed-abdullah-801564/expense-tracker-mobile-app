@@ -8,6 +8,7 @@ export const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
     Shopping: '#20B2AA',
     Health: '#32CD32',
     Snacks: '#F59E0B',
+    Drinks: '#3B82F6',
     Other: '#9CA3AF',
 };
 
@@ -19,6 +20,7 @@ export const CATEGORY_ICONS: Record<ExpenseCategory, string> = {
     Shopping: 'ShoppingBag',
     Health: 'Heart',
     Snacks: 'Coffee',
+    Drinks: 'CupSoda',
     Other: 'MoreHorizontal',
 };
 
@@ -30,5 +32,6 @@ export const CATEGORIES: ExpenseCategory[] = [
     'Shopping',
     'Health',
     'Snacks',
+    'Drinks',
     'Other',
 ];

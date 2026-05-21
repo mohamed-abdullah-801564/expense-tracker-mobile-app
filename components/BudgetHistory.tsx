@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { History, Plus, RefreshCw, Calendar } from 'lucide-react-native';
 import { BudgetTransaction } from '@/types/expense';
+import { useTheme } from '@/hooks/theme-store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface BudgetHistoryProps {
     transactions: BudgetTransaction[];
@@ -15,6 +17,10 @@ interface BudgetHistoryProps {
 }
 
 export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
+    const { colors, isDarkMode } = useTheme();
+    const insets = useSafeAreaInsets();
+    const styles = createStyles(colors);
+
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-IN', {
@@ -28,8 +34,10 @@ export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
 
     const renderTransaction = ({ item }: { item: BudgetTransaction }) => {
         const IconComponent = item.type === 'add' ? Plus : RefreshCw;
-        const iconColor = item.type === 'add' ? '#10B981' : '#4F46E5';
-        const backgroundColor = item.type === 'add' ? '#ECFDF5' : '#EEF2FF';
+        const iconColor = item.type === 'add' ? colors.success : colors.primary;
+        const backgroundColor = item.type === 'add'
+            ? (isDarkMode ? '#064E3B' : '#ECFDF5')
+            : (isDarkMode ? '#1E1B4B' : '#EEF2FF');
 
         return (
             <View style={styles.transactionItem}>
@@ -58,7 +66,7 @@ export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
 
                 <View style={styles.transactionFooter}>
                     <View style={styles.dateContainer}>
-                        <Calendar size={12} color="#9CA3AF" />
+                        <Calendar size={12} color={colors.textSecondary} />
                         <Text style={styles.transactionDate}>
                             {formatDate(item.createdAt)}
                         </Text>
@@ -75,43 +83,61 @@ export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <History size={24} color="#4F46E5" />
-                    <Text style={styles.title}>Budget History</Text>
+            <TouchableOpacity
+                style={styles.backdrop}
+                activeOpacity={1}
+                onPress={onClose}
+            />
+            <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom || 20 }]}>
+                <View style={[styles.header, { paddingTop: insets.top > 0 ? insets.top : 16 }]}>
+                    <View style={styles.headerLeft}>
+                        <History size={24} color={colors.primary} />
+                        <Text style={styles.title}>Budget History</Text>
+                    </View>
+                    {onClose && (
+                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                            <Text style={styles.closeButtonText}>Done</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
-                {onClose && (
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Text style={styles.closeButtonText}>Done</Text>
-                    </TouchableOpacity>
+
+                {transactions.length > 0 ? (
+                    <FlatList
+                        data={transactions}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderTransaction}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                    />
+                ) : (
+                    <View style={styles.emptyContainer}>
+                        <History size={48} color={colors.textSecondary} />
+                        <Text style={styles.emptyTitle}>No Budget History</Text>
+                        <Text style={styles.emptyText}>
+                            Budget changes will appear here when you update your budget.
+                        </Text>
+                    </View>
                 )}
             </View>
-
-            {transactions.length > 0 ? (
-                <FlatList
-                    data={transactions}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderTransaction}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
-            ) : (
-                <View style={styles.emptyContainer}>
-                    <History size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyTitle}>No Budget History</Text>
-                    <Text style={styles.emptyText}>
-                        Budget changes will appear here when you update your budget.
-                    </Text>
-                </View>
-            )}
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '85%',
+        width: '100%',
+        overflow: 'hidden',
     },
     header: {
         flexDirection: 'row',
@@ -119,9 +145,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingVertical: 16,
-        backgroundColor: 'white',
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: colors.border,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -131,12 +156,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1a1a1a',
+        color: colors.text,
     },
     closeButton: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: '#4F46E5',
+        backgroundColor: colors.primary,
         borderRadius: 16,
     },
     closeButtonText: {
@@ -149,7 +174,7 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
     },
     transactionItem: {
-        backgroundColor: 'white',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -158,6 +183,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 1,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     transactionHeader: {
         flexDirection: 'row',
@@ -178,22 +205,22 @@ const styles = StyleSheet.create({
     transactionType: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1a1a1a',
+        color: colors.text,
         marginBottom: 2,
     },
     transactionAmount: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#10B981',
+        color: colors.success,
     },
     previousAmount: {
         fontSize: 14,
         fontWeight: '400',
-        color: '#6B7280',
+        color: colors.textSecondary,
     },
     transactionDescription: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         lineHeight: 20,
         marginBottom: 12,
     },
@@ -209,19 +236,19 @@ const styles = StyleSheet.create({
     },
     transactionDate: {
         fontSize: 12,
-        color: '#9CA3AF',
+        color: colors.textSecondary,
     },
     deductionBadge: {
-        backgroundColor: '#FEF3C7',
+        backgroundColor: colors.warning + '20',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#F59E0B',
+        borderColor: colors.warning,
     },
     deductionText: {
         fontSize: 10,
-        color: '#D97706',
+        color: colors.warning,
         fontWeight: '600',
     },
     emptyContainer: {
@@ -229,17 +256,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 40,
+        paddingVertical: 60,
     },
     emptyTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#4B5563',
+        color: colors.text,
         marginTop: 16,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 16,
-        color: '#9CA3AF',
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
     },

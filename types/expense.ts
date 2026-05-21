@@ -20,6 +20,7 @@ export type ExpenseCategory =
     | 'Shopping'
     | 'Health'
     | 'Snacks'
+    | 'Drinks'
     | 'Other';
 
 export interface CategoryStats {

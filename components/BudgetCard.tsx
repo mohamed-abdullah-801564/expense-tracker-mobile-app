@@ -22,10 +22,8 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
         }
 
         const amount = parseFloat(topUpAmount);
-        // days=0 because for 'add' type, it should ignore days and keep existing dates if implemented correctly in store.
-        // Even if store needs days, we should probably pass 0 or current days.
-        // Checking store logic: if type === 'add', it uses existing budget dates.
-        setBudgetData(amount, 0, 'add');
+        const days = budgetProgress?.budget?.days ?? 0;
+        setBudgetData(amount, days, 'add');
 
         setShowTopUp(false);
         setTopUpAmount('');
