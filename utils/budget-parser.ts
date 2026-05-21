@@ -3,7 +3,7 @@ import { validateAmount } from './expense-parser';
 
 const LLM_API_URL = 'https://toolkit.rork.com/text/llm/';
 
-export async function parseBudgetWithAI(input: string): Promise<ParsedBudget> {
+export async function parseBudgetWithAI(input: string, currencySymbol: string = '₹'): Promise<ParsedBudget> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
@@ -75,7 +75,7 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
 
         const parsed = JSON.parse(cleanedCompletion);
 
-        const validation = validateAmount(parsed.budget_amount);
+        const validation = validateAmount(parsed.budget_amount, currencySymbol);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
@@ -93,14 +93,15 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
             console.error('Error parsing budget:', error);
         }
         // Fallback to basic parsing
-        return fallbackBudgetParser(input);
+        return fallbackBudgetParser(input, currencySymbol);
     }
 }
 
-function fallbackBudgetParser(input: string): ParsedBudget {
-    // Extract amount using regex - looks for numbers, potentially preceded by currency symbol
-    // Also explicitly look for "Budget X" pattern if generic match fails or to confirm intent
-    const amountMatch = input.match(/₹?(\d+(?:\.\d+)?)/);
+function fallbackBudgetParser(input: string, currencySymbol: string = '₹'): ParsedBudget {
+    const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Extract amount using dynamic regex, making the currency symbol optional
+    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
+    const amountMatch = input.match(amountRegex);
     const budget_amount = amountMatch ? parseFloat(amountMatch[1]) : 1000;
     const lowerInput = input.toLowerCase();
 

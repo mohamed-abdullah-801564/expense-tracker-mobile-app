@@ -140,7 +140,7 @@ export default function InsightsScreen() {
                     </Svg>
                     <View style={styles.chartInnerContent}>
                         <Text style={[styles.totalSpentText, { color: colors.text }]}>
-                            ₹{stats.total.toLocaleString('en-IN')}
+                            {colors.currencySymbol}{stats.total.toLocaleString('en-IN')}
                         </Text>
                     </View>
                 </View>
@@ -219,7 +219,7 @@ export default function InsightsScreen() {
                                                 {item.category} <Text style={{ fontSize: 12, fontWeight: '400', color: colors.textSecondary }}>{item.percentage.toFixed(1)}%</Text>
                                             </Text>
                                             <Text style={[styles.categoryAmount, { color: colors.text }]}>
-                                                ₹{item.total.toLocaleString('en-IN')}
+                                                {colors.currencySymbol}{item.total.toLocaleString('en-IN')}
                                             </Text>
                                         </View>
                                         <AnimatedProgressBar percentage={item.percentage} color={item.color} border={colors.border + '50'} />

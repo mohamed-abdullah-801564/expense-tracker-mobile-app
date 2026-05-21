@@ -28,9 +28,9 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
 
         setIsLoading(true);
         try {
-            const parsed = await parseBudgetWithAI(input);
+            const parsed = await parseBudgetWithAI(input, colors.currencySymbol);
 
-            const validation = validateAmount(parsed.budget_amount);
+            const validation = validateAmount(parsed.budget_amount, colors.currencySymbol);
             if (!validation.valid || isNaN(parsed.budget_amount) || parsed.budget_amount <= 0) {
                 Alert.alert('Invalid Amount', validation.error || 'Please enter a valid budget amount');
                 setIsLoading(false);
@@ -62,7 +62,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                 setBudgetData(parsed.budget_amount, daysToPass, 'add', false);
                 setInput('');
                 onClose();
-                Alert.alert('Success', `Budget updated: Added ₹${parsed.budget_amount} to current pool.`);
+                Alert.alert('Success', `Budget updated: Added ${colors.currencySymbol}${parsed.budget_amount} to current pool.`);
             } else if (allExpenses.length > 0) {
                 setShowDeductionChoice(true);
             } else {
@@ -133,7 +133,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                         {budgetProgress && (
                             <View style={[styles.currentBudget, { backgroundColor: colors.background }]}>
                                 <Text style={[styles.currentBudgetTitle, { color: colors.textSecondary }]}>Current Budget</Text>
-                                <Text style={[styles.currentBudgetAmount, { color: colors.text }]}>₹{budgetProgress.budget.amount}</Text>
+                                <Text style={[styles.currentBudgetAmount, { color: colors.text }]}>{colors.currencySymbol}{budgetProgress.budget.amount}</Text>
                                 <Text style={[styles.currentBudgetDays, { color: colors.textSecondary }]}>
                                     {budgetProgress.daysRemaining} days remaining
                                 </Text>
@@ -149,7 +149,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                                     />
                                 </View>
                                 <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-                                    ₹{budgetProgress.totalSpent} / ₹{budgetProgress.budget.amount} spent
+                                    {colors.currencySymbol}{budgetProgress.totalSpent} / {colors.currencySymbol}{budgetProgress.budget.amount} spent
                                 </Text>
                             </View>
                         )}

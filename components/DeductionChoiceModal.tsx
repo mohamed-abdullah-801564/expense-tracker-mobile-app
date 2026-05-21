@@ -56,10 +56,10 @@ export function DeductionChoiceModal({
 
                         <View style={[styles.calculationInfo, { backgroundColor: colors.background }]}>
                             <Text style={[styles.calculationText, { color: colors.text }]}>
-                                New Budget: ₹{budgetAmount.toFixed(2)}
+                                New Budget: {colors.currencySymbol}{budgetAmount.toFixed(2)}
                             </Text>
                             <Text style={[styles.calculationText, { color: colors.text }]}>
-                                Existing Expenses: ₹{totalExpenses.toFixed(2)}
+                                Existing Expenses: {colors.currencySymbol}{totalExpenses.toFixed(2)}
                             </Text>
                         </View>
 
@@ -74,7 +74,7 @@ export function DeductionChoiceModal({
                                         Deduct Expenses
                                     </Text>
                                     <Text style={styles.buttonSubtext}>
-                                        Remaining: ₹{remainingAfterDeduction.toFixed(2)}
+                                        Remaining: {colors.currencySymbol}{remainingAfterDeduction.toFixed(2)}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
@@ -89,7 +89,7 @@ export function DeductionChoiceModal({
                                         Keep Full Amount
                                     </Text>
                                     <Text style={styles.buttonSubtext}>
-                                        Balance: ₹{budgetAmount.toFixed(2)}
+                                        Balance: {colors.currencySymbol}{budgetAmount.toFixed(2)}
                                     </Text>
                                 </View>
                             </TouchableOpacity>

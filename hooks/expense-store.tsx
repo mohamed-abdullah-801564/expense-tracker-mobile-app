@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Expense, ExpenseCategory, CategoryStats, Budget, BudgetTransaction } from '@/types/expense';
 import { CATEGORIES } from '@/constants/categories';
+import { useTheme } from '@/hooks/theme-store';
 
 const STORAGE_KEY = 'expenses';
 const BUDGET_STORAGE_KEY = 'budget';
@@ -130,6 +131,7 @@ const StorageUtils = {
 // Create a stable context value function
 function useCreateExpenseContext() {
     const queryClient = useQueryClient();
+    const { colors } = useTheme();
 
     // Always call hooks in the same order - state hooks first
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -319,15 +321,15 @@ function useCreateExpenseContext() {
             endDate = new Date(budget.endDate);
 
             finalAmount = budget.amount + budgetAmount;
-            description = `Added ₹${budgetAmount} to existing budget of ₹${budget.amount}`;
+            description = `Added ${colors.currencySymbol}${budgetAmount} to existing budget of ${colors.currencySymbol}${budget.amount}`;
         } else {
-            description = `Set new budget of ₹${budgetAmount} for ${budgetDays} days`;
+            description = `Set new budget of ${colors.currencySymbol}${budgetAmount} for ${budgetDays} days`;
         }
 
         if (deductExistingExpenses) {
             const totalExpenses = expenses.filter(e => !e.isDeleted).reduce((sum, exp) => sum + exp.amount, 0);
             finalAmount = Math.max(0, finalAmount - totalExpenses);
-            description += ` (deducted ₹${totalExpenses} existing expenses)`;
+            description += ` (deducted ${colors.currencySymbol}${totalExpenses} existing expenses)`;
         }
 
         const newBudget: Budget = {
@@ -355,7 +357,7 @@ function useCreateExpenseContext() {
         setBudgetHistory(updatedHistory);
         saveBudget(newBudget);
         saveBudgetHistory(updatedHistory);
-    }, [budget, expenses, budgetHistory, saveBudget, saveBudgetHistory]);
+    }, [budget, expenses, budgetHistory, saveBudget, saveBudgetHistory, colors.currencySymbol]);
 
     const clearBudget = useCallback(() => {
         setBudget(null);

@@ -155,7 +155,7 @@ export default function FriendsScreen() {
                     <View style={styles.splitHeader}>
                         <Text style={styles.splitDescription}>{split.description}</Text>
                         <Text style={[styles.splitAmount, isBorrow && { color: colors.error }]}>
-                            {isBorrow ? '-' : ''}₹{split.amount.toFixed(2)}
+                            {isBorrow ? '-' : ''}{colors.currencySymbol}{split.amount.toFixed(2)}
                         </Text>
                     </View>
                     <Text style={styles.splitDate}>
@@ -194,8 +194,8 @@ export default function FriendsScreen() {
 
         const netBalance = item.netBalance;
         const netBalanceColor = netBalance > 0 ? colors.success : netBalance < 0 ? colors.error : colors.textSecondary;
-        const netBalanceText = netBalance > 0 ? `Owes you ₹${netBalance.toFixed(2)}` :
-            netBalance < 0 ? `You owe ₹${Math.abs(netBalance).toFixed(2)}` :
+        const netBalanceText = netBalance > 0 ? `Owes you ${colors.currencySymbol}${netBalance.toFixed(2)}` :
+            netBalance < 0 ? `You owe ${colors.currencySymbol}${Math.abs(netBalance).toFixed(2)}` :
                 `Settled`;
 
         return (
@@ -316,14 +316,14 @@ export default function FriendsScreen() {
                                     styles.summaryValue,
                                     { color: totalNetBalance >= 0 ? colors.success : colors.error }
                                 ]}>
-                                    {totalNetBalance >= 0 ? '+' : ''}₹{totalNetBalance.toFixed(2)}
+                                    {totalNetBalance >= 0 ? '+' : ''}{colors.currencySymbol}{totalNetBalance.toFixed(2)}
                                 </Text>
                             </View>
                             <View style={styles.summaryDivider} />
                             <View style={styles.summaryItem}>
                                 <Text style={styles.summaryLabel}>Total Paid</Text>
                                 <Text style={[styles.summaryValue, styles.paidAmount]}>
-                                    ₹{totalPaid.toFixed(2)}
+                                    {colors.currencySymbol}{totalPaid.toFixed(2)}
                                 </Text>
                             </View>
                         </View>

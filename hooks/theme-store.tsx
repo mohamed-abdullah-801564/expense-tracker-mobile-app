@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ThemeColors } from '@/types/expense';
 
 const THEME_STORAGE_KEY = 'theme_mode';
+const CURRENCY_STORAGE_KEY = 'currency_symbol';
 
 const lightTheme: ThemeColors = {
     background: '#F9FAFB',
@@ -19,6 +20,7 @@ const lightTheme: ThemeColors = {
     warning: '#F59E0B',
     tabBarBackground: '#FFFFFF',
     headerBackground: '#FFFFFF',
+    currencySymbol: '₹',
 };
 
 const darkTheme: ThemeColors = {
@@ -34,11 +36,13 @@ const darkTheme: ThemeColors = {
     warning: '#FBBF24',
     tabBarBackground: '#1F2937',
     headerBackground: '#1F2937',
+    currencySymbol: '₹',
 };
 
 function useCreateThemeContext() {
     const queryClient = useQueryClient();
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+    const [currencySymbol, setCurrencySymbol] = useState<string>('₹');
 
     const themeQuery = useQuery({
         queryKey: ['theme'],
@@ -51,6 +55,22 @@ function useCreateThemeContext() {
             } catch (error) {
                 console.error('Error loading theme:', error);
                 return false;
+            }
+        },
+        staleTime: 0,
+        gcTime: 1000 * 60 * 5,
+    });
+
+    const currencyQuery = useQuery({
+        queryKey: ['currencySymbol'],
+        queryFn: async () => {
+            try {
+                const stored = await AsyncStorage.getItem(CURRENCY_STORAGE_KEY);
+                console.log('Loaded currency symbol from storage:', stored || '₹');
+                return stored || '₹';
+            } catch (error) {
+                console.error('Error loading currency symbol:', error);
+                return '₹';
             }
         },
         staleTime: 0,
@@ -76,11 +96,36 @@ function useCreateThemeContext() {
         }
     });
 
+    const saveCurrencyMutation = useMutation({
+        mutationFn: async (symbol: string) => {
+            try {
+                await AsyncStorage.setItem(CURRENCY_STORAGE_KEY, symbol);
+                console.log('Saved currency symbol to storage:', symbol);
+                return symbol;
+            } catch (error) {
+                console.error('Failed to save currency symbol:', error);
+                throw error;
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['currencySymbol'] });
+        },
+        onError: (error) => {
+            console.error('Currency symbol save mutation failed:', error);
+        }
+    });
+
     useEffect(() => {
         if (themeQuery.data !== undefined) {
             setIsDarkMode(themeQuery.data);
         }
     }, [themeQuery.data]);
+
+    useEffect(() => {
+        if (currencyQuery.data !== undefined) {
+            setCurrencySymbol(currencyQuery.data);
+        }
+    }, [currencyQuery.data]);
 
     const { mutate: saveTheme } = saveThemeMutation;
 
@@ -90,13 +135,24 @@ function useCreateThemeContext() {
         saveTheme(newMode);
     }, [isDarkMode, saveTheme]);
 
-    const colors = isDarkMode ? darkTheme : lightTheme;
+    const updateCurrencySymbol = useCallback((symbol: string) => {
+        setCurrencySymbol(symbol);
+        saveCurrencyMutation.mutate(symbol);
+    }, [saveCurrencyMutation]);
+
+    const baseColors = isDarkMode ? darkTheme : lightTheme;
+    const colors = {
+        ...baseColors,
+        currencySymbol,
+    };
 
     return {
         isDarkMode,
         colors,
         toggleTheme,
-        isLoading: themeQuery.isLoading,
+        currencySymbol,
+        updateCurrencySymbol,
+        isLoading: themeQuery.isLoading || currencyQuery.isLoading,
     };
 }
 

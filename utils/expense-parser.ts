@@ -4,17 +4,17 @@ import { CATEGORIES } from '@/constants/categories';
 export const MAX_AMOUNT = 1000000;
 export const MIN_AMOUNT = 0.01;
 
-export function validateAmount(amount: number): { valid: boolean; error?: string } {
+export function validateAmount(amount: number, currencySymbol: string = '₹'): { valid: boolean; error?: string } {
     if (amount <= 0) {
         return { valid: false, error: 'Amount must be greater than zero' };
     }
     if (amount > MAX_AMOUNT) {
-        return { valid: false, error: `Amount cannot exceed ₹${MAX_AMOUNT.toLocaleString('en-IN')}` };
+        return { valid: false, error: `Amount cannot exceed ${currencySymbol}${MAX_AMOUNT.toLocaleString('en-IN')}` };
     }
     return { valid: true };
 }
 
-export async function parseExpenseWithAI(input: string): Promise<ParsedExpense> {
+export async function parseExpenseWithAI(input: string, currencySymbol: string = '₹'): Promise<ParsedExpense> {
     const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including shared expenses and payments to friends. When given a natural language input, your task is to:
         
 1. Extract the expense amount as a number.
@@ -87,7 +87,7 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
 
         const parsed = JSON.parse(cleanedCompletion);
 
-        const validation = validateAmount(parsed.amount);
+        const validation = validateAmount(parsed.amount, currencySymbol);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
@@ -112,15 +112,17 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
         } else {
             console.error('Error parsing expense:', error);
         }
-        return fallbackParser(input);
+        return fallbackParser(input, currencySymbol);
     } finally {
         clearTimeout(timeoutId);
     }
 }
 
-function fallbackParser(input: string): ParsedExpense {
-    // Extract amount using regex
-    const amountMatch = input.match(/₹?(\d+(?:\.\d+)?)/);
+function fallbackParser(input: string, currencySymbol: string = '₹'): ParsedExpense {
+    const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Extract amount using dynamic regex, making the currency symbol optional
+    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
+    const amountMatch = input.match(amountRegex);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
 
     // Extract time using regex
@@ -128,7 +130,8 @@ function fallbackParser(input: string): ParsedExpense {
     const time = timeMatch ? timeMatch[1] : undefined;
 
     // Remove amount and time from description
-    let description = input.replace(/₹?\d+(?:\.\d+)?/g, '').trim();
+    const cleanupRegex = new RegExp(`(?:${escapedSymbol})?\\d+(?:\\.\\d+)?`, 'g');
+    let description = input.replace(cleanupRegex, '').trim();
     if (time) {
         description = description.replace(new RegExp(time.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').trim();
     }

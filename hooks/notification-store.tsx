@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { NotificationSettings, RecurringBill } from '@/types/expense';
 import { useExpenses } from './expense-store';
+import { useTheme } from '@/hooks/theme-store';
 
 const NOTIFICATION_SETTINGS_KEY = 'notification_settings';
 const RECURRING_BILLS_KEY = 'recurring_bills';
@@ -38,6 +39,7 @@ if (Platform.OS !== 'web') {
 function useCreateNotificationContext() {
     const queryClient = useQueryClient();
     const { budgetProgress, allExpenses } = useExpenses();
+    const { colors } = useTheme();
     const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
     const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
     const [hasNotifiedBudget80, setHasNotifiedBudget80] = useState<boolean>(false);
@@ -213,13 +215,13 @@ function useCreateNotificationContext() {
             if (percentageUsed >= 100 && !hasNotifiedBudget100) {
                 scheduleNotification(
                     'Budget Exceeded!',
-                    `You've exceeded your budget by ₹${Math.abs(budgetProgress.remaining).toFixed(2)}`
+                    `You've exceeded your budget by ${colors.currencySymbol}${Math.abs(budgetProgress.remaining).toFixed(2)}`
                 );
                 setHasNotifiedBudget100(true);
             } else if (percentageUsed >= 80 && percentageUsed < 100 && !hasNotifiedBudget80) {
                 scheduleNotification(
                     'Budget Alert',
-                    `You've used ${percentageUsed.toFixed(1)}% of your budget. ₹${budgetProgress.remaining.toFixed(2)} remaining.`
+                    `You've used ${percentageUsed.toFixed(1)}% of your budget. ${colors.currencySymbol}${budgetProgress.remaining.toFixed(2)} remaining.`
                 );
                 setHasNotifiedBudget80(true);
             }
@@ -237,7 +239,7 @@ function useCreateNotificationContext() {
                 clearTimeout(budgetNotificationTimeoutRef.current);
             }
         };
-    }, [budgetProgress, settings.budgetAlerts, hasNotifiedBudget80, hasNotifiedBudget100, scheduleNotification]);
+    }, [budgetProgress, settings.budgetAlerts, hasNotifiedBudget80, hasNotifiedBudget100, scheduleNotification, colors.currencySymbol]);
 
     useEffect(() => {
         if (!settings.dailyLimitAlerts || !budgetProgress) {
@@ -271,7 +273,7 @@ function useCreateNotificationContext() {
                 const excess = todayTotal - dailyLimit;
                 scheduleNotification(
                     'Daily Limit Exceeded',
-                    `Today's expenses (₹${todayTotal.toFixed(2)}) exceeded your daily limit of ₹${dailyLimit.toFixed(2)} by ₹${excess.toFixed(2)}`
+                    `Today's expenses (${colors.currencySymbol}${todayTotal.toFixed(2)}) exceeded your daily limit of ${colors.currencySymbol}${dailyLimit.toFixed(2)} by ${colors.currencySymbol}${excess.toFixed(2)}`
                 );
             }
 
@@ -283,7 +285,7 @@ function useCreateNotificationContext() {
                 clearTimeout(dailyLimitTimeoutRef.current);
             }
         };
-    }, [allExpenses, budgetProgress, settings.dailyLimitAlerts, scheduleNotification]);
+    }, [allExpenses, budgetProgress, settings.dailyLimitAlerts, scheduleNotification, colors.currencySymbol]);
 
     useEffect(() => {
         if (!settings.recurringBillReminders) return;
@@ -298,11 +300,11 @@ function useCreateNotificationContext() {
             if (dueDate.toDateString() === tomorrow.toDateString()) {
                 scheduleNotification(
                     'Bill Reminder',
-                    `${bill.name} (₹${bill.amount}) is due tomorrow`
+                    `${bill.name} (${colors.currencySymbol}${bill.amount}) is due tomorrow`
                 );
             }
         });
-    }, [recurringBills, settings.recurringBillReminders, scheduleNotification]);
+    }, [recurringBills, settings.recurringBillReminders, scheduleNotification, colors.currencySymbol]);
 
     useEffect(() => {
         if (!settings.budgetPeriodReminders || !budgetProgress) return;

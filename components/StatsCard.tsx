@@ -27,7 +27,7 @@ export function StatsCard({ stat }: StatsCardProps) {
             </View>
 
             <View style={styles.footer}>
-                <Text style={styles.amount}>₹{stat.total.toFixed(2)}</Text>
+                <Text style={styles.amount}>{colors.currencySymbol}{stat.total.toFixed(2)}</Text>
                 <Text style={[styles.percentage, { color: CATEGORY_COLORS[stat.category] }]}>
                     {stat.percentage.toFixed(1)}%
                 </Text>

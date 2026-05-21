@@ -78,6 +78,7 @@ export interface ThemeColors {
     warning: string;
     tabBarBackground: string;
     headerBackground: string;
+    currencySymbol: string;
 }
 
 export interface NotificationSettings {

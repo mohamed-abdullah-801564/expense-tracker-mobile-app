@@ -57,10 +57,10 @@ export function BudgetChoiceModal({
                         {currentBudget && (
                             <View style={[styles.budgetInfo, { backgroundColor: colors.background }]}>
                                 <Text style={[styles.budgetInfoText, { color: colors.text }]}>
-                                    Current Budget: ₹{currentBudget.toFixed(2)}
+                                    Current Budget: {colors.currencySymbol}{currentBudget.toFixed(2)}
                                 </Text>
                                 <Text style={[styles.budgetInfoText, { color: colors.text }]}>
-                                    New Amount: ₹{newAmount.toFixed(2)}
+                                    New Amount: {colors.currencySymbol}{newAmount.toFixed(2)}
                                 </Text>
                             </View>
                         )}
@@ -76,7 +76,7 @@ export function BudgetChoiceModal({
                                 </Text>
                                 {currentBudget && (
                                     <Text style={styles.buttonSubtext}>
-                                        Total: ₹{(currentBudget + newAmount).toFixed(2)}
+                                        Total: {colors.currencySymbol}{(currentBudget + newAmount).toFixed(2)}
                                     </Text>
                                 )}
                             </TouchableOpacity>
@@ -90,7 +90,7 @@ export function BudgetChoiceModal({
                                     Replace Total
                                 </Text>
                                 <Text style={styles.buttonSubtext}>
-                                    New Total: ₹{newAmount.toFixed(2)}
+                                    New Total: {colors.currencySymbol}{newAmount.toFixed(2)}
                                 </Text>
                             </TouchableOpacity>
                         </View>

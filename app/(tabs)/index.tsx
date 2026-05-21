@@ -49,7 +49,7 @@ export default function ExpensesScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.totalLabel}>Total Expenses</Text>
-          <Text style={styles.totalAmount}>₹{stats.total.toFixed(2)}</Text>
+          <Text style={styles.totalAmount}>{colors.currencySymbol}{stats.total.toFixed(2)}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity

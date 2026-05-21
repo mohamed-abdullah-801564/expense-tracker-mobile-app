@@ -85,7 +85,7 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                 </View>
             </View>
 
-            <Text style={styles.amount}>₹{expense.amount.toFixed(2)}</Text>
+            <Text style={styles.amount}>{colors.currencySymbol}{expense.amount.toFixed(2)}</Text>
         </TouchableOpacity>
     );
 }

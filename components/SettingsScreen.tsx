@@ -37,7 +37,7 @@ import HowItWorksScreen from '@/components/HowItWorksScreen';
 const categories: ExpenseCategory[] = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'];
 
 export default function SettingsScreen() {
-    const { colors, isDarkMode, toggleTheme } = useTheme();
+    const { colors, isDarkMode, toggleTheme, currencySymbol, updateCurrencySymbol } = useTheme();
     const {
         settings,
         updateSettings,
@@ -124,7 +124,7 @@ export default function SettingsScreen() {
                         const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
                         report += `Item: ${item.description}\n`;
-                        report += `Amount: ₹${item.amount.toFixed(2)}\n`;
+                        report += `Amount: ${colors.currencySymbol}${item.amount.toFixed(2)}\n`;
                         report += `Date: ${formattedDate}\n`;
                         report += `Category: ${item.category}\n`;
                         report += "----------------\n";
@@ -171,7 +171,7 @@ export default function SettingsScreen() {
                     const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
                     report += `Item: ${item.description}\n`;
-                    report += `Amount: ₹${item.amount.toFixed(2)}\n`;
+                    report += `Amount: ${colors.currencySymbol}${item.amount.toFixed(2)}\n`;
                     report += `Date: ${formattedDate}\n`;
                     report += `Category: ${item.category}\n`;
                     report += "----------------\n";
@@ -254,6 +254,37 @@ export default function SettingsScreen() {
                             thumbColor={colors.surface}
                         />
                     </View>
+                    <View style={[styles.settingItem, { borderBottomWidth: 0, paddingBottom: 6 }]}>
+                        <View style={styles.settingLeft}>
+                            <DollarSign size={20} color={colors.text} />
+                            <Text style={styles.settingLabel}>Primary Currency</Text>
+                        </View>
+                    </View>
+                    <View style={styles.currencySelectorContainer}>
+                        {['₹', '$', '€', '£', '¥', '₩'].map((symbol) => {
+                            const isActive = currencySymbol === symbol;
+                            return (
+                                <TouchableOpacity
+                                    key={symbol}
+                                    style={[
+                                        styles.currencyButton,
+                                        isActive && { 
+                                            backgroundColor: colors.primary, 
+                                            borderColor: colors.primary,
+                                        }
+                                    ]}
+                                    onPress={() => updateCurrencySymbol(symbol)}
+                                >
+                                    <Text style={[
+                                        styles.currencyButtonText,
+                                        { color: isActive ? '#FFFFFF' : colors.text }
+                                    ]}>
+                                        {symbol}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </View>
 
                 <View style={styles.section}>
@@ -331,7 +362,7 @@ export default function SettingsScreen() {
                                 <View style={styles.billInfo}>
                                     <Text style={styles.billName}>{bill.name}</Text>
                                     <Text style={styles.billDetails}>
-                                        ₹{bill.amount} • {bill.category} • {bill.frequency}
+                                        {colors.currencySymbol}{bill.amount} • {bill.category} • {bill.frequency}
                                     </Text>
                                     <Text style={styles.billDue}>Due: {bill.dueDate}</Text>
                                 </View>
@@ -586,6 +617,28 @@ const createStyles = (colors: any) => StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
+    },
+    currencySelectorContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 4,
+        paddingBottom: 12,
+        gap: 6,
+    },
+    currencyButton: {
+        flex: 1,
+        height: 40,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    currencyButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
     },
     settingLeft: {
         flexDirection: 'row',

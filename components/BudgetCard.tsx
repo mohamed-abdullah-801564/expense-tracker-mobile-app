@@ -113,12 +113,12 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             {/* Main Content */}
             <View style={styles.mainContent}>
                 <Text style={[styles.remainingAmount, { color: colors.text }]}>
-                    ₹{budgetProgress.remaining.toLocaleString()}
+                    {colors.currencySymbol}{budgetProgress.remaining.toLocaleString()}
                 </Text>
 
                 <View style={styles.totalRow}>
                     <Text style={styles.totalText}>
-                        of ₹{budgetProgress.budget.amount.toLocaleString()} total
+                        of {colors.currencySymbol}{budgetProgress.budget.amount.toLocaleString()} total
                     </Text>
                     <TouchableOpacity onPress={() => setShowTopUp(true)} style={styles.topUpButton}>
                         <Plus size={14} color="white" />
@@ -145,7 +145,7 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             <View style={styles.footer}>
                 <View style={styles.footerItem}>
                     <Text style={[styles.footerHighlight, { color: colors.primary }]}>
-                        ₹{dailyLimit.toFixed(0)}
+                        {colors.currencySymbol}{dailyLimit.toFixed(0)}
                         <Text style={styles.footerLabel}>/day limit</Text>
                     </Text>
                 </View>

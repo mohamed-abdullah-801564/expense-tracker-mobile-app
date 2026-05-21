@@ -36,7 +36,9 @@ function GlobalStatusBar() {
 
 function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart: () => void }) {
   const [showButton, setShowButton] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('₹');
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { updateCurrencySymbol } = useTheme();
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -59,6 +61,11 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
     };
   }, [isDataReady, fadeAnim]);
 
+  const handleStart = () => {
+    updateCurrencySymbol(selectedCurrency);
+    onStart();
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBar style="light" translucent={true} backgroundColor="transparent" />
@@ -69,17 +76,56 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
         priority="high"
       />
       {showButton && (
-        <Animated.View style={{ opacity: fadeAnim, position: 'absolute', bottom: 50, alignSelf: 'center' }}>
+        <Animated.View style={{ opacity: fadeAnim, position: 'absolute', bottom: 50, left: 24, right: 24, alignItems: 'center' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginBottom: 12, textShadowColor: 'rgba(0, 0, 0, 0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+            Select your primary currency
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+            {['₹', '$', '€', '£'].map((symbol) => {
+              const isActive = selectedCurrency === symbol;
+              return (
+                <TouchableOpacity
+                  key={symbol}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.15)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderWidth: isActive ? 0 : 1,
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    shadowColor: isActive ? '#000' : 'transparent',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isActive ? 0.2 : 0,
+                    shadowRadius: 4,
+                    elevation: isActive ? 4 : 0,
+                  }}
+                  onPress={() => setSelectedCurrency(symbol)}
+                >
+                  <Text style={{ color: isActive ? '#7C3AED' : '#FFFFFF', fontSize: 20, fontWeight: '700' }}>
+                    {symbol}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <TouchableOpacity
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 16,
-              paddingHorizontal: 40,
               paddingVertical: 16,
               justifyContent: 'center',
               alignItems: 'center',
+              width: '100%',
+              maxWidth: 280,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 5,
             }}
-            onPress={onStart}
+            onPress={handleStart}
           >
             <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 18 }}>Get Started</Text>
           </TouchableOpacity>

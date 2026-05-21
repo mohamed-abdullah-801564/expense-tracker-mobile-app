@@ -75,15 +75,15 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
 
         setIsParsing(true);
         try {
-            const parsed = await parseExpenseWithAI(input);
+            const parsed = await parseExpenseWithAI(input, colors.currencySymbol);
 
             if (!parsed.amount || isNaN(parsed.amount) || parsed.amount === 0) {
-                Alert.alert('Missing Amount', "Please mention the price (e.g., 'Coffee 50')");
+                Alert.alert('Missing Amount', `Please mention the price (e.g., 'Coffee ${colors.currencySymbol}50')`);
                 setIsParsing(false);
                 return;
             }
 
-            const validation = validateAmount(parsed.amount);
+            const validation = validateAmount(parsed.amount, colors.currencySymbol);
             if (!validation.valid) {
                 Alert.alert('Invalid Amount', validation.error || 'Please enter a valid amount');
                 setIsParsing(false);
@@ -124,7 +124,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     addSplitExpenses(splits);
                     Alert.alert(
                         'Split Expense Added',
-                        `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ₹${splitData.amountPerPerson.toFixed(2)} each.`,
+                        `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ${colors.currencySymbol}${splitData.amountPerPerson.toFixed(2)} each.`,
                         [{ text: 'OK' }]
                     );
                 } catch (e) {
@@ -182,7 +182,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                             Describe your expense naturally
                         </Text>
                         <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                            e.g., &quot;Coffee ₹50&quot;, &quot;Lunch 400 split 4 with John, Sarah, Mike&quot;, &quot;Dinner 600 split 2 with Alex&quot;
+                            e.g., "Coffee {colors.currencySymbol}50", "Lunch 400 split 4 with John, Sarah, Mike", "Dinner 600 split 2 with Alex"
                         </Text>
 
                         <TextInput
@@ -213,10 +213,10 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                         <View style={styles.examples}>
                             <Text style={[styles.examplesTitle, { color: colors.textSecondary }]}>Quick Examples:</Text>
                             {[
-                                'Lunch ₹150 at 1 PM',
+                                `Lunch ${colors.currencySymbol}150 at 1 PM`,
                                 'Dinner 400 split 4 with John, Sarah, Mike',
                                 'Movie 300 split 2 with Alex',
-                                'Coffee ₹50 morning',
+                                `Coffee ${colors.currencySymbol}50 morning`,
                                 'Borrowed 500 from Ram',
                                 'Lent 200 to Sam'
                             ].map((example, index) => (

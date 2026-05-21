@@ -50,10 +50,10 @@ export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
                             {item.type === 'add' ? 'Added to Budget' : 'Replaced Budget'}
                         </Text>
                         <Text style={styles.transactionAmount}>
-                            ₹{item.amount.toFixed(2)}
+                            {colors.currencySymbol}{item.amount.toFixed(2)}
                             {item.previousAmount && item.type === 'add' && (
                                 <Text style={styles.previousAmount}>
-                                    {' '}(was ₹{item.previousAmount.toFixed(2)})
+                                    {' '}(was {colors.currencySymbol}{item.previousAmount.toFixed(2)})
                                 </Text>
                             )}
                         </Text>

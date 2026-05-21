@@ -51,7 +51,7 @@ export default function HistoryScreen() {
                     <Text style={styles.expenseCategory}>{item.category}</Text>
                 </View>
                 <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
-                    ₹{item.amount.toFixed(2)}
+                    {colors.currencySymbol}{item.amount.toFixed(2)}
                 </Text>
             </View>
             <View style={styles.expenseFooter}>
