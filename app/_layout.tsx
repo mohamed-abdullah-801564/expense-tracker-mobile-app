@@ -20,6 +20,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import { useExpenses } from '@/hooks/expense-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
+import CurrencyPicker from '@/components/CurrencyPicker';
 
 function GlobalModals() {
   const { isFeedbackModalVisible, setFeedbackModalVisible } = useExpenses();
@@ -38,9 +39,9 @@ function GlobalStatusBar() {
 
 function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart: () => void }) {
   const [showContent, setShowContent] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('₹');
+  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState<string>('INR');
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { colors, isDarkMode, updateCurrencySymbol } = useTheme();
+  const { colors, isDarkMode, updateCurrencyCode } = useTheme();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -55,7 +56,7 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
   }, [isDataReady]);
 
   const handleStart = () => {
-    updateCurrencySymbol(selectedCurrency);
+    updateCurrencyCode(selectedCurrencyCode);
     onStart();
   };
 
@@ -89,35 +90,11 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
           <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 16 }}>
             Select your primary currency
           </Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
-            {['₹', '$', '€', '£'].map((symbol) => {
-              const isActive = selectedCurrency === symbol;
-              return (
-                <TouchableOpacity
-                  key={symbol}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 28,
-                    backgroundColor: isActive ? colors.primary : colors.card,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: isActive ? 0 : 1,
-                    borderColor: colors.border,
-                    shadowColor: isActive ? colors.primary : '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isActive ? 0.25 : 0.05,
-                    shadowRadius: 4,
-                    elevation: isActive ? 4 : 1,
-                  }}
-                  onPress={() => setSelectedCurrency(symbol)}
-                >
-                  <Text style={{ color: isActive ? '#FFFFFF' : colors.text, fontSize: 22, fontWeight: '700' }}>
-                    {symbol}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={{ width: '100%', maxWidth: 320, marginBottom: 28 }}>
+            <CurrencyPicker
+              selectedCode={selectedCurrencyCode}
+              onSelectCode={setSelectedCurrencyCode}
+            />
           </View>
           <TouchableOpacity
             style={{
@@ -147,19 +124,16 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
 function AppContent() {
   const { isLoading: isThemeLoading } = useTheme();
   const { isLoading: isExpensesLoading } = useExpenses();
-  const { isLoading: isFirstTimeLoading, markGuideAsSeen } = useFirstTime();
+  const { isLoading: isFirstTimeLoading, markGuideAsSeen, hasSeenGuide } = useFirstTime();
   const { isLoading: isNotificationsLoading } = useNotifications();
-
-  const [hasStarted, setHasStarted] = useState(false);
 
   const isDataReady = !isExpensesLoading && !isThemeLoading && !isFirstTimeLoading && !isNotificationsLoading;
 
-  if (!hasStarted) {
+  if (!isDataReady || !hasSeenGuide) {
     return (
       <LaunchScreen 
         isDataReady={isDataReady} 
         onStart={() => {
-          setHasStarted(true);
           markGuideAsSeen();
         }} 
       />

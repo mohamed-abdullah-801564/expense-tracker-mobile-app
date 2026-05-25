@@ -3,9 +3,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import { ThemeColors } from '@/types/expense';
+import { currencies } from '@/constants/currencies';
 
 const THEME_STORAGE_KEY = 'theme_mode';
 const CURRENCY_STORAGE_KEY = 'currency_symbol';
+
+const symbolToCodeMap: Record<string, string> = {
+    '₹': 'INR',
+    '$': 'USD',
+    '€': 'EUR',
+    '£': 'GBP',
+    '¥': 'JPY',
+    '₩': 'KRW',
+};
 
 const lightTheme: ThemeColors = {
     background: '#F9FAFB',
@@ -42,7 +52,7 @@ const darkTheme: ThemeColors = {
 function useCreateThemeContext() {
     const queryClient = useQueryClient();
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-    const [currencySymbol, setCurrencySymbol] = useState<string>('₹');
+    const [currencyCode, setCurrencyCode] = useState<string>('INR');
 
     const themeQuery = useQuery({
         queryKey: ['theme'],
@@ -62,15 +72,16 @@ function useCreateThemeContext() {
     });
 
     const currencyQuery = useQuery({
-        queryKey: ['currencySymbol'],
+        queryKey: ['currencyCode'],
         queryFn: async () => {
             try {
                 const stored = await AsyncStorage.getItem(CURRENCY_STORAGE_KEY);
-                console.log('Loaded currency symbol from storage:', stored || '₹');
-                return stored || '₹';
+                const code = symbolToCodeMap[stored || ''] || stored || 'INR';
+                console.log('Loaded currency code from storage:', code);
+                return code;
             } catch (error) {
-                console.error('Error loading currency symbol:', error);
-                return '₹';
+                console.error('Error loading currency code:', error);
+                return 'INR';
             }
         },
         staleTime: 0,
@@ -97,21 +108,21 @@ function useCreateThemeContext() {
     });
 
     const saveCurrencyMutation = useMutation({
-        mutationFn: async (symbol: string) => {
+        mutationFn: async (code: string) => {
             try {
-                await AsyncStorage.setItem(CURRENCY_STORAGE_KEY, symbol);
-                console.log('Saved currency symbol to storage:', symbol);
-                return symbol;
+                await AsyncStorage.setItem(CURRENCY_STORAGE_KEY, code);
+                console.log('Saved currency code to storage:', code);
+                return code;
             } catch (error) {
-                console.error('Failed to save currency symbol:', error);
+                console.error('Failed to save currency code:', error);
                 throw error;
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['currencySymbol'] });
+            queryClient.invalidateQueries({ queryKey: ['currencyCode'] });
         },
         onError: (error) => {
-            console.error('Currency symbol save mutation failed:', error);
+            console.error('Currency code save mutation failed:', error);
         }
     });
 
@@ -123,7 +134,7 @@ function useCreateThemeContext() {
 
     useEffect(() => {
         if (currencyQuery.data !== undefined) {
-            setCurrencySymbol(currencyQuery.data);
+            setCurrencyCode(currencyQuery.data);
         }
     }, [currencyQuery.data]);
 
@@ -135,10 +146,19 @@ function useCreateThemeContext() {
         saveTheme(newMode);
     }, [isDarkMode, saveTheme]);
 
-    const updateCurrencySymbol = useCallback((symbol: string) => {
-        setCurrencySymbol(symbol);
-        saveCurrencyMutation.mutate(symbol);
+    const updateCurrencyCode = useCallback((code: string) => {
+        setCurrencyCode(code);
+        saveCurrencyMutation.mutate(code);
     }, [saveCurrencyMutation]);
+
+    const updateCurrencySymbol = useCallback((symbol: string) => {
+        const matched = currencies.find(c => c.currencySymbol === symbol);
+        const code = matched ? matched.currencyCode : (symbolToCodeMap[symbol] || 'INR');
+        updateCurrencyCode(code);
+    }, [updateCurrencyCode]);
+
+    const activeCurrency = currencies.find(c => c.currencyCode === currencyCode) || currencies[0];
+    const currencySymbol = activeCurrency.currencySymbol;
 
     const baseColors = isDarkMode ? darkTheme : lightTheme;
     const colors = {
@@ -151,7 +171,9 @@ function useCreateThemeContext() {
         colors,
         toggleTheme,
         currencySymbol,
+        currencyCode,
         updateCurrencySymbol,
+        updateCurrencyCode,
         isLoading: themeQuery.isLoading || currencyQuery.isLoading,
     };
 }

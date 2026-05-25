@@ -33,11 +33,12 @@ import { useNotifications } from '@/hooks/notification-store';
 import { useExpenses } from '@/hooks/expense-store';
 import { ExpenseCategory } from '@/types/expense';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
+import CurrencyPicker from './CurrencyPicker';
 
 const categories: ExpenseCategory[] = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'];
 
 export default function SettingsScreen() {
-    const { colors, isDarkMode, toggleTheme, currencySymbol, updateCurrencySymbol } = useTheme();
+    const { colors, isDarkMode, toggleTheme, currencyCode, updateCurrencyCode } = useTheme();
     const {
         settings,
         updateSettings,
@@ -254,30 +255,11 @@ export default function SettingsScreen() {
                             <Text style={styles.settingLabel}>Primary Currency</Text>
                         </View>
                     </View>
-                    <View style={styles.currencySelectorContainer}>
-                        {['₹', '$', '€', '£', '¥', '₩'].map((symbol) => {
-                            const isActive = currencySymbol === symbol;
-                            return (
-                                <TouchableOpacity
-                                    key={symbol}
-                                    style={[
-                                        styles.currencyButton,
-                                        isActive && { 
-                                            backgroundColor: colors.primary, 
-                                            borderColor: colors.primary,
-                                        }
-                                    ]}
-                                    onPress={() => updateCurrencySymbol(symbol)}
-                                >
-                                    <Text style={[
-                                        styles.currencyButtonText,
-                                        { color: isActive ? '#FFFFFF' : colors.text }
-                                    ]}>
-                                        {symbol}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
+                    <View style={{ paddingTop: 4, paddingBottom: 12 }}>
+                        <CurrencyPicker
+                            selectedCode={currencyCode}
+                            onSelectCode={updateCurrencyCode}
+                        />
                     </View>
                 </View>
 
