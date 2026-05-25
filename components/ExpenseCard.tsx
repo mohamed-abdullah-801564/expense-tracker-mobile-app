@@ -5,19 +5,82 @@ import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/categories';
 import * as LucideIcons from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
+import { currencies } from '@/constants/currencies';
+import { getFallbackRate } from '@/utils/expense-parser';
 
 interface ExpenseCardProps {
     expense: Expense;
 }
 
+// Global cache for exchange rates to prevent multiple requests while scrolling
+const exchangeRateCache: Record<string, { rate: number; timestamp: number }> = {};
+const CACHE_TTL = 1000 * 60 * 60; // 1 hour TTL
+
+const getSymbolFromCode = (code: string) => {
+    const matched = currencies.find(c => c.currencyCode === code);
+    return matched ? matched.currencySymbol : code;
+};
+
 export function ExpenseCard({ expense }: ExpenseCardProps) {
     const { deleteExpense } = useExpenses();
-    const { colors } = useTheme();
+    const { colors, currencyCode, homeCurrencyCode } = useTheme();
     const styles = createStyles(colors);
     
     const iconName = CATEGORY_ICONS[expense.category] || CATEGORY_ICONS['Other'];
     const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as React.ComponentType<any>;
     const categoryColor = CATEGORY_COLORS[expense.category] || CATEGORY_COLORS['Other'];
+
+    const targetRemittanceCode = expense.remittanceCode || homeCurrencyCode;
+    
+    const [exchangeRate, setExchangeRate] = React.useState<number>(() => {
+        const cacheKey = `${currencyCode}_${targetRemittanceCode}`;
+        const cached = exchangeRateCache[cacheKey];
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            return cached.rate;
+        }
+        return getFallbackRate(currencyCode, targetRemittanceCode);
+    });
+
+    React.useEffect(() => {
+        if (!expense.isRemittance) return;
+        // If we already have historical frozen values, skip fetching
+        if (expense.historicalConvertedAmount !== undefined && expense.historicalHomeSymbol !== undefined) return;
+        
+        const cacheKey = `${currencyCode}_${targetRemittanceCode}`;
+        const cached = exchangeRateCache[cacheKey];
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            setExchangeRate(cached.rate);
+            return;
+        }
+
+        let isMounted = true;
+        fetch(`https://api.frankfurter.app/latest?from=${currencyCode}&to=${targetRemittanceCode}`)
+            .then(res => {
+                if (!res.ok) throw new Error('API error');
+                return res.json();
+            })
+            .then(data => {
+                const rate = data.rates[targetRemittanceCode];
+                if (rate && isMounted) {
+                    exchangeRateCache[cacheKey] = {
+                        rate,
+                        timestamp: Date.now()
+                    };
+                    setExchangeRate(rate);
+                }
+            })
+            .catch(err => {
+                console.warn('Failed to fetch exchange rate, using fallback multiplier:', err);
+                if (isMounted) {
+                    const fallback = getFallbackRate(currencyCode, targetRemittanceCode);
+                    setExchangeRate(fallback);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [expense.isRemittance, currencyCode, targetRemittanceCode, homeCurrencyCode, expense.historicalConvertedAmount, expense.historicalHomeSymbol]);
 
     const handleDelete = () => {
         Alert.alert(
@@ -42,6 +105,17 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
             year: 'numeric'
         });
     };
+
+    // Calculate final display conversion values using locked snapshot OR active dynamic rate
+    let displayHomeSymbol = expense.historicalHomeSymbol;
+    let displayConvertedAmount = expense.historicalConvertedAmount !== undefined 
+        ? expense.historicalConvertedAmount.toFixed(2) 
+        : undefined;
+
+    if (expense.isRemittance && (displayHomeSymbol === undefined || displayConvertedAmount === undefined)) {
+        displayHomeSymbol = getSymbolFromCode(targetRemittanceCode);
+        displayConvertedAmount = (expense.amount * exchangeRate).toFixed(2);
+    }
 
     return (
         <TouchableOpacity
@@ -85,7 +159,14 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                 </View>
             </View>
 
-            <Text style={styles.amount}>{colors.currencySymbol}{expense.amount.toFixed(2)}</Text>
+            <View style={styles.amountContainer}>
+                <Text style={styles.amount}>{colors.currencySymbol}{expense.amount.toFixed(2)}</Text>
+                {expense.isRemittance && (
+                    <Text style={styles.remittanceSubtext}>
+                        ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                    </Text>
+                )}
+            </View>
         </TouchableOpacity>
     );
 }
@@ -141,10 +222,20 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         fontStyle: 'italic',
     },
+    amountContainer: {
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
     amount: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.text,
+    },
+    remittanceSubtext: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+        marginTop: 2,
     },
     extraInfo: {
         marginVertical: 4,

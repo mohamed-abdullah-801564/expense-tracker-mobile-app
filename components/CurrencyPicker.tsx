@@ -17,11 +17,12 @@ import { useTheme } from '@/hooks/theme-store';
 import { currencies, CountryCurrency } from '@/constants/currencies';
 
 interface CurrencyPickerProps {
-    selectedCode: string;
-    onSelectCode: (code: string) => void;
+    selectedCountryName: string;
+    onSelectCountryName: (countryName: string) => void;
+    title?: string;
 }
 
-export default function CurrencyPicker({ selectedCode, onSelectCode }: CurrencyPickerProps) {
+export default function CurrencyPicker({ selectedCountryName, onSelectCountryName, title }: CurrencyPickerProps) {
     const { colors } = useTheme();
     const [modalVisible, setModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -30,8 +31,8 @@ export default function CurrencyPicker({ selectedCode, onSelectCode }: CurrencyP
 
     // Find the currently selected currency details
     const activeCurrency = useMemo(() => {
-        return currencies.find(c => c.currencyCode === selectedCode) || currencies[0];
-    }, [selectedCode]);
+        return currencies.find(c => c.countryName === selectedCountryName) || currencies[0];
+    }, [selectedCountryName]);
 
     // Filter currencies based on search query
     const filteredCurrencies = useMemo(() => {
@@ -46,13 +47,13 @@ export default function CurrencyPicker({ selectedCode, onSelectCode }: CurrencyP
     }, [searchQuery]);
 
     const handleSelect = (item: CountryCurrency) => {
-        onSelectCode(item.currencyCode);
+        onSelectCountryName(item.countryName);
         setSearchQuery('');
         setModalVisible(false);
     };
 
     const renderItem = ({ item }: { item: CountryCurrency }) => {
-        const isSelected = item.currencyCode === selectedCode;
+        const isSelected = item.countryName === selectedCountryName;
         return (
             <TouchableOpacity
                 style={[
@@ -91,7 +92,7 @@ export default function CurrencyPicker({ selectedCode, onSelectCode }: CurrencyP
                 <View style={styles.dropdownLeft}>
                     <Text style={styles.dropdownFlag}>{activeCurrency.flag}</Text>
                     <Text style={styles.dropdownText}>
-                        {activeCurrency.currencyCode} ({activeCurrency.currencySymbol})
+                        {activeCurrency.currencyCode} ({activeCurrency.currencySymbol}) - {activeCurrency.countryName}
                     </Text>
                 </View>
                 <ChevronDown size={20} color={colors.textSecondary} />
@@ -119,7 +120,7 @@ export default function CurrencyPicker({ selectedCode, onSelectCode }: CurrencyP
 
                             {/* Header */}
                             <View style={styles.header}>
-                                <Text style={styles.headerTitle}>Select Currency</Text>
+                                <Text style={styles.headerTitle}>{title || "Select Currency"}</Text>
                                 <TouchableOpacity
                                     style={styles.closeButton}
                                     onPress={() => {
@@ -207,6 +208,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        flex: 1,
     },
     dropdownFlag: {
         fontSize: 22,
@@ -215,6 +217,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: colors.text,
+        flex: 1,
     },
     modalOverlay: {
         flex: 1,

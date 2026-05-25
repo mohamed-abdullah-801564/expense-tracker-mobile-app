@@ -16,10 +16,12 @@ import { SearchFilters, searchAndFilterExpenses } from '@/utils/search-filter';
 import { useDebounce } from '@/hooks/use-debounce';
 import SearchBar from '@/components/SearchBar';
 import { BudgetHistory } from '@/components/BudgetHistory';
+import { currencies } from '@/constants/currencies';
+import { getFallbackRate } from '@/utils/expense-parser';
 
 export default function HistoryScreen() {
     const { allExpenses, isLoading, budgetHistory } = useExpenses();
-    const { colors } = useTheme();
+    const { colors, currencyCode, homeCurrencyCode } = useTheme();
     const [selectedFilter, setSelectedFilter] = useState<FilterType>('This Month');
     const [showHistory, setShowHistory] = useState(false);
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
@@ -41,34 +43,56 @@ export default function HistoryScreen() {
 
     const styles = createStyles(colors);
 
-    const renderExpenseItem = useCallback(({ item }: { item: FilteredExpenseResult & { isDeleted?: boolean } }) => (
-        <View style={[styles.expenseItem, item.isDeleted && styles.deletedItem]}>
-            <View style={styles.expenseHeader}>
-                <View style={styles.expenseInfo}>
-                    <Text style={[styles.expenseDescription, item.isDeleted && styles.deletedText]}>
-                        {item.description} {item.isDeleted && '(Deleted)'}
-                    </Text>
-                    <Text style={styles.expenseCategory}>{item.category}</Text>
+    const renderExpenseItem = useCallback(({ item }: { item: FilteredExpenseResult & { isDeleted?: boolean } }) => {
+        let displayHomeSymbol = item.historicalHomeSymbol;
+        let displayConvertedAmount = item.historicalConvertedAmount !== undefined 
+            ? item.historicalConvertedAmount.toFixed(2) 
+            : undefined;
+
+        if (item.isRemittance && (displayHomeSymbol === undefined || displayConvertedAmount === undefined)) {
+            const targetRemittanceCode = item.remittanceCode || homeCurrencyCode;
+            const matched = currencies.find(c => c.currencyCode === targetRemittanceCode);
+            displayHomeSymbol = matched ? matched.currencySymbol : targetRemittanceCode;
+            const rate = getFallbackRate(currencyCode, targetRemittanceCode);
+            displayConvertedAmount = (item.amount * rate).toFixed(2);
+        }
+
+        return (
+            <View style={[styles.expenseItem, item.isDeleted && styles.deletedItem]}>
+                <View style={styles.expenseHeader}>
+                    <View style={styles.expenseInfo}>
+                        <Text style={[styles.expenseDescription, item.isDeleted && styles.deletedText]}>
+                            {item.description} {item.isDeleted && '(Deleted)'}
+                        </Text>
+                        <Text style={styles.expenseCategory}>{item.category}</Text>
+                    </View>
+                    <View style={styles.amountContainer}>
+                        <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
+                            {colors.currencySymbol}{item.amount.toFixed(2)}
+                        </Text>
+                        {item.isRemittance && (
+                            <Text style={styles.remittanceSubtext}>
+                                ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                            </Text>
+                        )}
+                    </View>
                 </View>
-                <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
-                    {colors.currencySymbol}{item.amount.toFixed(2)}
-                </Text>
-            </View>
-            <View style={styles.expenseFooter}>
-                <View style={styles.dateTimeContainer}>
-                    <Calendar size={14} color={colors.textSecondary} />
-                    <Text style={styles.expenseDate}>{item.date}</Text>
-                    {item.time && (
-                        <>
-                            <Clock size={14} color={colors.textSecondary} />
-                            <Text style={styles.expenseTime}>{item.time}</Text>
-                        </>
-                    )}
+                <View style={styles.expenseFooter}>
+                    <View style={styles.dateTimeContainer}>
+                        <Calendar size={14} color={colors.textSecondary} />
+                        <Text style={styles.expenseDate}>{item.date}</Text>
+                        {item.time && (
+                            <>
+                                <Clock size={14} color={colors.textSecondary} />
+                                <Text style={styles.expenseTime}>{item.time}</Text>
+                            </>
+                        )}
+                    </View>
+                    <Text style={styles.expenseMonthYear}>{item.month} {item.year}</Text>
                 </View>
-                <Text style={styles.expenseMonthYear}>{item.month} {item.year}</Text>
             </View>
-        </View>
-    ), [colors, styles]);
+        );
+    }, [colors, styles, currencyCode, homeCurrencyCode]);
 
     if (isLoading) {
         return (
@@ -384,5 +408,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     deletedText: {
         textDecorationLine: 'line-through',
         color: colors.textSecondary,
+    },
+    amountContainer: {
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
+    remittanceSubtext: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+        marginTop: 2,
     },
 });

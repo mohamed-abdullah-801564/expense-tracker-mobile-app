@@ -10,6 +10,11 @@ export interface FilteredExpenseResult {
     time: string;
     month: string;
     year: string;
+    isRemittance?: boolean;
+    remittanceCode?: string;
+    historicalPrimarySymbol?: string;
+    historicalHomeSymbol?: string;
+    historicalConvertedAmount?: number;
 }
 
 export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult {
@@ -40,7 +45,12 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
         date: formattedDate,
         time: formattedTime,
         month: monthNames[expenseDate.getMonth()],
-        year: expenseDate.getFullYear().toString()
+        year: expenseDate.getFullYear().toString(),
+        isRemittance: expense.isRemittance,
+        remittanceCode: expense.remittanceCode,
+        historicalPrimarySymbol: expense.historicalPrimarySymbol,
+        historicalHomeSymbol: expense.historicalHomeSymbol,
+        historicalConvertedAmount: expense.historicalConvertedAmount,
     };
 }
 

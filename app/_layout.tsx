@@ -39,9 +39,9 @@ function GlobalStatusBar() {
 
 function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart: () => void }) {
   const [showContent, setShowContent] = useState(false);
-  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState<string>('INR');
+  const [selectedCountryName, setSelectedCountryName] = useState<string>('India');
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { colors, isDarkMode, updateCurrencyCode } = useTheme();
+  const { colors, isDarkMode, updateCurrencyCountryName } = useTheme();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -56,7 +56,7 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
   }, [isDataReady]);
 
   const handleStart = () => {
-    updateCurrencyCode(selectedCurrencyCode);
+    updateCurrencyCountryName(selectedCountryName);
     onStart();
   };
 
@@ -92,8 +92,8 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
           </Text>
           <View style={{ width: '100%', maxWidth: 320, marginBottom: 28 }}>
             <CurrencyPicker
-              selectedCode={selectedCurrencyCode}
-              onSelectCode={setSelectedCurrencyCode}
+              selectedCountryName={selectedCountryName}
+              onSelectCountryName={setSelectedCountryName}
             />
           </View>
           <TouchableOpacity

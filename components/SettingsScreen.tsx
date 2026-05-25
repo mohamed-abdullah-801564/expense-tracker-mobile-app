@@ -38,7 +38,15 @@ import CurrencyPicker from './CurrencyPicker';
 const categories: ExpenseCategory[] = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'];
 
 export default function SettingsScreen() {
-    const { colors, isDarkMode, toggleTheme, currencyCode, updateCurrencyCode } = useTheme();
+    const {
+        colors,
+        isDarkMode,
+        toggleTheme,
+        currencyCountryName,
+        updateCurrencyCountryName,
+        homeCurrencyCountryName,
+        updateHomeCurrencyCountryName
+    } = useTheme();
     const {
         settings,
         updateSettings,
@@ -257,8 +265,21 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ paddingTop: 4, paddingBottom: 12 }}>
                         <CurrencyPicker
-                            selectedCode={currencyCode}
-                            onSelectCode={updateCurrencyCode}
+                            selectedCountryName={currencyCountryName}
+                            onSelectCountryName={updateCurrencyCountryName}
+                        />
+                    </View>
+                    <View style={[styles.settingItem, { borderBottomWidth: 0, paddingBottom: 6, paddingTop: 12 }]}>
+                        <View style={styles.settingLeft}>
+                            <DollarSign size={20} color={colors.text} />
+                            <Text style={styles.settingLabel}>Home Country Currency (For Remittance)</Text>
+                        </View>
+                    </View>
+                    <View style={{ paddingTop: 4, paddingBottom: 12 }}>
+                        <CurrencyPicker
+                            selectedCountryName={homeCurrencyCountryName}
+                            onSelectCountryName={updateHomeCurrencyCountryName}
+                            title="Select Home Country Currency"
                         />
                     </View>
                 </View>

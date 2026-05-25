@@ -7,6 +7,10 @@ import { currencies } from '@/constants/currencies';
 
 const THEME_STORAGE_KEY = 'theme_mode';
 const CURRENCY_STORAGE_KEY = 'currency_symbol';
+const HOME_CURRENCY_STORAGE_KEY = 'home_currency_code';
+
+const CURRENCY_COUNTRY_STORAGE_KEY = 'currency_country_name';
+const HOME_CURRENCY_COUNTRY_STORAGE_KEY = 'home_currency_country_name';
 
 const symbolToCodeMap: Record<string, string> = {
     '₹': 'INR',
@@ -49,10 +53,37 @@ const darkTheme: ThemeColors = {
     currencySymbol: '₹',
 };
 
+const getCountryFromStoredCodeOrSymbol = (stored: string | null): string => {
+    if (!stored) return 'India';
+    const cleaned = stored.trim();
+    
+    // Match by countryName directly (if already stored as country name)
+    const matchedByName = currencies.find(c => c.countryName.toLowerCase() === cleaned.toLowerCase());
+    if (matchedByName) return matchedByName.countryName;
+    
+    // Match by currencyCode
+    const matchedByCode = currencies.find(c => c.currencyCode.toLowerCase() === cleaned.toLowerCase());
+    if (matchedByCode) return matchedByCode.countryName;
+    
+    // Match by symbol
+    const matchedBySymbol = currencies.find(c => c.currencySymbol === cleaned);
+    if (matchedBySymbol) return matchedBySymbol.countryName;
+    
+    // Try mapping table lookup
+    const code = symbolToCodeMap[cleaned];
+    if (code) {
+        const matched = currencies.find(c => c.currencyCode === code);
+        if (matched) return matched.countryName;
+    }
+    
+    return 'India';
+};
+
 function useCreateThemeContext() {
     const queryClient = useQueryClient();
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-    const [currencyCode, setCurrencyCode] = useState<string>('INR');
+    const [currencyCountryName, setCurrencyCountryName] = useState<string>('India');
+    const [homeCurrencyCountryName, setHomeCurrencyCountryName] = useState<string>('India');
 
     const themeQuery = useQuery({
         queryKey: ['theme'],
@@ -72,16 +103,35 @@ function useCreateThemeContext() {
     });
 
     const currencyQuery = useQuery({
-        queryKey: ['currencyCode'],
+        queryKey: ['currencyCountryName'],
         queryFn: async () => {
             try {
-                const stored = await AsyncStorage.getItem(CURRENCY_STORAGE_KEY);
-                const code = symbolToCodeMap[stored || ''] || stored || 'INR';
-                console.log('Loaded currency code from storage:', code);
-                return code;
+                const storedCountry = await AsyncStorage.getItem(CURRENCY_COUNTRY_STORAGE_KEY);
+                if (storedCountry) return storedCountry;
+                
+                const storedLegacy = await AsyncStorage.getItem(CURRENCY_STORAGE_KEY);
+                return getCountryFromStoredCodeOrSymbol(storedLegacy);
             } catch (error) {
-                console.error('Error loading currency code:', error);
-                return 'INR';
+                console.error('Error loading currency country:', error);
+                return 'India';
+            }
+        },
+        staleTime: 0,
+        gcTime: 1000 * 60 * 5,
+    });
+
+    const homeCurrencyQuery = useQuery({
+        queryKey: ['homeCurrencyCountryName'],
+        queryFn: async () => {
+            try {
+                const storedCountry = await AsyncStorage.getItem(HOME_CURRENCY_COUNTRY_STORAGE_KEY);
+                if (storedCountry) return storedCountry;
+                
+                const storedLegacy = await AsyncStorage.getItem(HOME_CURRENCY_STORAGE_KEY);
+                return getCountryFromStoredCodeOrSymbol(storedLegacy);
+            } catch (error) {
+                console.error('Error loading home currency country:', error);
+                return 'India';
             }
         },
         staleTime: 0,
@@ -108,21 +158,40 @@ function useCreateThemeContext() {
     });
 
     const saveCurrencyMutation = useMutation({
-        mutationFn: async (code: string) => {
+        mutationFn: async (countryName: string) => {
             try {
-                await AsyncStorage.setItem(CURRENCY_STORAGE_KEY, code);
-                console.log('Saved currency code to storage:', code);
-                return code;
+                await AsyncStorage.setItem(CURRENCY_COUNTRY_STORAGE_KEY, countryName);
+                console.log('Saved currency country to storage:', countryName);
+                return countryName;
             } catch (error) {
-                console.error('Failed to save currency code:', error);
+                console.error('Failed to save currency country:', error);
                 throw error;
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['currencyCode'] });
+            queryClient.invalidateQueries({ queryKey: ['currencyCountryName'] });
         },
         onError: (error) => {
-            console.error('Currency code save mutation failed:', error);
+            console.error('Currency country save mutation failed:', error);
+        }
+    });
+
+    const saveHomeCurrencyMutation = useMutation({
+        mutationFn: async (countryName: string) => {
+            try {
+                await AsyncStorage.setItem(HOME_CURRENCY_COUNTRY_STORAGE_KEY, countryName);
+                console.log('Saved home currency country to storage:', countryName);
+                return countryName;
+            } catch (error) {
+                console.error('Failed to save home currency country:', error);
+                throw error;
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['homeCurrencyCountryName'] });
+        },
+        onError: (error) => {
+            console.error('Home currency country save mutation failed:', error);
         }
     });
 
@@ -134,9 +203,15 @@ function useCreateThemeContext() {
 
     useEffect(() => {
         if (currencyQuery.data !== undefined) {
-            setCurrencyCode(currencyQuery.data);
+            setCurrencyCountryName(currencyQuery.data);
         }
     }, [currencyQuery.data]);
+
+    useEffect(() => {
+        if (homeCurrencyQuery.data !== undefined) {
+            setHomeCurrencyCountryName(homeCurrencyQuery.data);
+        }
+    }, [homeCurrencyQuery.data]);
 
     const { mutate: saveTheme } = saveThemeMutation;
 
@@ -146,19 +221,43 @@ function useCreateThemeContext() {
         saveTheme(newMode);
     }, [isDarkMode, saveTheme]);
 
-    const updateCurrencyCode = useCallback((code: string) => {
-        setCurrencyCode(code);
-        saveCurrencyMutation.mutate(code);
+    const updateCurrencyCountryName = useCallback((countryName: string) => {
+        setCurrencyCountryName(countryName);
+        saveCurrencyMutation.mutate(countryName);
     }, [saveCurrencyMutation]);
 
-    const updateCurrencySymbol = useCallback((symbol: string) => {
-        const matched = currencies.find(c => c.currencySymbol === symbol);
-        const code = matched ? matched.currencyCode : (symbolToCodeMap[symbol] || 'INR');
-        updateCurrencyCode(code);
-    }, [updateCurrencyCode]);
+    const updateHomeCurrencyCountryName = useCallback((countryName: string) => {
+        setHomeCurrencyCountryName(countryName);
+        saveHomeCurrencyMutation.mutate(countryName);
+    }, [saveHomeCurrencyMutation]);
 
-    const activeCurrency = currencies.find(c => c.currencyCode === currencyCode) || currencies[0];
+    const updateCurrencyCode = useCallback((code: string) => {
+        const country = currencies.find(c => c.currencyCode === code);
+        if (country) {
+            updateCurrencyCountryName(country.countryName);
+        }
+    }, [updateCurrencyCountryName]);
+
+    const updateCurrencySymbol = useCallback((symbol: string) => {
+        const country = currencies.find(c => c.currencySymbol === symbol);
+        if (country) {
+            updateCurrencyCountryName(country.countryName);
+        }
+    }, [updateCurrencyCountryName]);
+
+    const updateHomeCurrencyCode = useCallback((code: string) => {
+        const country = currencies.find(c => c.currencyCode === code);
+        if (country) {
+            updateHomeCurrencyCountryName(country.countryName);
+        }
+    }, [updateHomeCurrencyCountryName]);
+
+    const activeCurrency = currencies.find(c => c.countryName === currencyCountryName) || currencies[0];
+    const currencyCode = activeCurrency.currencyCode;
     const currencySymbol = activeCurrency.currencySymbol;
+
+    const activeHomeCurrency = currencies.find(c => c.countryName === homeCurrencyCountryName) || currencies[0];
+    const homeCurrencyCode = activeHomeCurrency.currencyCode;
 
     const baseColors = isDarkMode ? darkTheme : lightTheme;
     const colors = {
@@ -172,9 +271,15 @@ function useCreateThemeContext() {
         toggleTheme,
         currencySymbol,
         currencyCode,
+        currencyCountryName,
+        updateCurrencyCountryName,
         updateCurrencySymbol,
         updateCurrencyCode,
-        isLoading: themeQuery.isLoading || currencyQuery.isLoading,
+        homeCurrencyCode,
+        homeCurrencyCountryName,
+        updateHomeCurrencyCode,
+        updateHomeCurrencyCountryName,
+        isLoading: themeQuery.isLoading || currencyQuery.isLoading || homeCurrencyQuery.isLoading,
     };
 }
 

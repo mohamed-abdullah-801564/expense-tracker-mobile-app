@@ -10,6 +10,11 @@ export interface Expense {
     note?: string;
     createdAt: string;
     isDeleted?: boolean;
+    isRemittance?: boolean;
+    remittanceCode?: string;
+    historicalPrimarySymbol?: string;
+    historicalHomeSymbol?: string;
+    historicalConvertedAmount?: number;
 }
 
 export type ExpenseCategory =
@@ -21,6 +26,7 @@ export type ExpenseCategory =
     | 'Health'
     | 'Snacks'
     | 'Drinks'
+    | 'Remittance'
     | 'Other';
 
 export interface CategoryStats {
@@ -38,6 +44,11 @@ export interface ParsedExpense {
     shared_amount?: number;
     paid_to?: string;
     note?: string;
+    isRemittance?: boolean;
+    remittanceCode?: string;
+    historicalPrimarySymbol?: string;
+    historicalHomeSymbol?: string;
+    historicalConvertedAmount?: number;
 }
 
 export interface Budget {

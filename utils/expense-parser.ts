@@ -4,6 +4,32 @@ import { CATEGORIES } from '@/constants/categories';
 export const MAX_AMOUNT = 1000000;
 export const MIN_AMOUNT = 0.01;
 
+export const getFallbackRate = (from: string, to: string): number => {
+    if (from === to) return 1.0;
+    
+    const pair = `${from}_${to}`;
+    const fallbacks: Record<string, number> = {
+        'USD_INR': 83.5,
+        'INR_USD': 0.012,
+        'EUR_INR': 90.0,
+        'INR_EUR': 0.011,
+        'GBP_INR': 105.0,
+        'INR_GBP': 0.0095,
+        'AED_INR': 22.7,
+        'INR_AED': 0.044,
+        'SAR_INR': 22.2,
+        'INR_SAR': 0.045,
+        'SGD_INR': 61.5,
+        'INR_SGD': 0.016,
+        'CAD_INR': 61.0,
+        'INR_CAD': 0.016,
+        'AUD_INR': 55.0,
+        'INR_AUD': 0.018,
+    };
+    
+    return fallbacks[pair] || 1.0;
+};
+
 export function validateAmount(amount: number, currencySymbol: string = '₹'): { valid: boolean; error?: string } {
     if (amount <= 0) {
         return { valid: false, error: 'Amount must be greater than zero' };
@@ -14,18 +40,20 @@ export function validateAmount(amount: number, currencySymbol: string = '₹'): 
     return { valid: true };
 }
 
-export async function parseExpenseWithAI(input: string, currencySymbol: string = '₹'): Promise<ParsedExpense> {
+export async function parseExpenseWithAI(input: string, currencySymbol: string = '₹', homeCurrencyCode: string = 'INR'): Promise<ParsedExpense> {
     const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including shared expenses and payments to friends. When given a natural language input, your task is to:
         
 1. Extract the expense amount as a number.
 2. Extract the expense description or item name clearly.
-3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, Drinks, or Other.
+3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, Drinks, Remittance, or Other.
    - For hot beverages (e.g., tea, coffee, chai, boost) and small food items, classify as 'Snacks'.
    - For cold beverages (e.g., water, juice, soda, milkshakes, cool drinks), classify as 'Drinks'.
+   - If the description refers to sending money, transferring money, or remitting money home, to family, to mom, to dad, or to parents (containing words like sent, send, transfer, remit, remittance, family, mom, dad, parent), you MUST categorize it as 'Remittance' and set 'isRemittance' to true.
 4. If the expense input contains time or part of the day (like '5 PM', 'morning'), extract it as 'time'. If not present, omit the time field.
 5. Extract details about shared expenses or payments:
    - If the user mentions splitting the expense, extract the shared amount and indicate it's split.
    - If the user mentions paying a friend, extract the amount paid and the person or label if specified.
+6. If the user describes an expense about sending money to family back home, transferring money internationally, or remitting across borders (e.g., "sent 500 dollars to family", "remitted 2000 to home account"), you must flag "isRemittance": true. You should also extract the 3-letter target currency code as "remittanceCode" if specified, or default to "${homeCurrencyCode}".
 
 Return a structured JSON response with keys:
 - amount (number)
@@ -35,6 +63,8 @@ Return a structured JSON response with keys:
 - shared_amount (number, optional)
 - paid_to (text, optional)
 - note (text, optional)
+- isRemittance (boolean, optional)
+- remittanceCode (text, optional)
 
 Examples:
 Input: 'Lunch 300 rupees split with friend 150'
@@ -43,8 +73,11 @@ Output: { "amount": 300, "description": "Lunch", "category": "Food", "shared_amo
 Input: 'Paid friend 60 for movie'
 Output: { "amount": 60, "description": "Movie payment", "category": "Entertainment", "paid_to": "friend" }
 
-Input: 'Lunch 150 rupees at 1 PM'
-Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 PM" }`;
+Input: 'sent 500 dollars to family'
+Output: { "amount": 500, "description": "Sent money to family", "category": "Remittance", "isRemittance": true, "remittanceCode": "USD" }
+
+Input: 'remitted 2000 to home account'
+Output: { "amount": 2000, "description": "Remittance to home account", "category": "Remittance", "isRemittance": true, "remittanceCode": "${homeCurrencyCode}" }`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -92,8 +125,11 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
             throw new Error(validation.error);
         }
 
+        const isRemittance = parsed.isRemittance || false;
         let parsedCategory = parsed.category as ParsedExpense['category'];
-        if (!CATEGORIES.includes(parsedCategory)) {
+        if (isRemittance) {
+            parsedCategory = 'Remittance';
+        } else if (!CATEGORIES.includes(parsedCategory)) {
             parsedCategory = 'Other';
         }
 
@@ -104,7 +140,9 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
             ...(parsed.time && { time: parsed.time }),
             ...(parsed.shared_amount && { shared_amount: parsed.shared_amount }),
             ...(parsed.paid_to && { paid_to: parsed.paid_to }),
-            ...(parsed.note && { note: parsed.note })
+            ...(parsed.note && { note: parsed.note }),
+            isRemittance,
+            remittanceCode: parsed.remittanceCode || homeCurrencyCode,
         };
     } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -112,13 +150,13 @@ Output: { "amount": 150, "description": "Lunch", "category": "Food", "time": "1 
         } else {
             console.error('Error parsing expense:', error);
         }
-        return fallbackParser(input, currencySymbol);
+        return fallbackParser(input, currencySymbol, homeCurrencyCode);
     } finally {
         clearTimeout(timeoutId);
     }
 }
 
-function fallbackParser(input: string, currencySymbol: string = '₹'): ParsedExpense {
+function fallbackParser(input: string, currencySymbol: string = '₹', homeCurrencyCode: string = 'INR'): ParsedExpense {
     const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Extract amount using dynamic regex, making the currency symbol optional
     const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
@@ -139,9 +177,16 @@ function fallbackParser(input: string, currencySymbol: string = '₹'): ParsedEx
 
     // Basic keyword-based categorization
     const lowerInput = input.toLowerCase();
+    
+    // Explicit variations to match: "sent", "send", "transfer", "remit", "remittance", "sent home", "to family", "to mom", "to dad"
+    const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "sent home", "to family", "to mom", "to dad"];
+    const isRemittance = remittanceKeywords.some(keyword => lowerInput.includes(keyword));
+
     let category: ParsedExpense['category'] = 'Other';
 
-    if (lowerInput.includes('food') || lowerInput.includes('lunch') || lowerInput.includes('dinner') || lowerInput.includes('breakfast')) {
+    if (isRemittance) {
+        category = 'Remittance';
+    } else if (lowerInput.includes('food') || lowerInput.includes('lunch') || lowerInput.includes('dinner') || lowerInput.includes('breakfast')) {
         category = 'Food';
     } else if (lowerInput.includes('bus') || lowerInput.includes('taxi') || lowerInput.includes('uber') || lowerInput.includes('transport') || lowerInput.includes('fuel')) {
         category = 'Transport';
@@ -159,5 +204,22 @@ function fallbackParser(input: string, currencySymbol: string = '₹'): ParsedEx
         category = 'Drinks';
     }
 
-    return { amount, description, category, ...(time && { time }) };
+    let remittanceCode = homeCurrencyCode;
+    const words = lowerInput.toUpperCase().split(/\s+/);
+    const currenciesList = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'AED', 'SAR', 'SGD', 'CNY', 'KRW'];
+    for (const word of words) {
+        if (currenciesList.includes(word)) {
+            remittanceCode = word;
+            break;
+        }
+    }
+
+    return {
+        amount,
+        description,
+        category,
+        ...(time && { time }),
+        isRemittance,
+        remittanceCode: isRemittance ? remittanceCode : undefined,
+    };
 }

@@ -16,9 +16,10 @@ import { X } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
-import { parseExpenseWithAI, validateAmount } from '@/utils/expense-parser';
+import { parseExpenseWithAI, validateAmount, getFallbackRate } from '@/utils/expense-parser';
 import { parseSplitExpense, createSplitExpenses, parseDebt, ParsedSplitWithNames } from '@/utils/split-expense-parser';
 import { SplitExpense } from '@/types/expense';
+import { currencies } from '@/constants/currencies';
 
 
 interface AddExpenseSheetProps {
@@ -31,7 +32,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
     const [isParsing, setIsParsing] = useState(false);
     const { addExpense } = useExpenses();
     const { addSplitExpenses } = useSplitExpenses();
-    const { colors } = useTheme();
+    const { colors, homeCurrencyCode } = useTheme();
 
     const handleSubmit = async () => {
         if (!input.trim()) {
@@ -75,7 +76,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
 
         setIsParsing(true);
         try {
-            const parsed = await parseExpenseWithAI(input, colors.currencySymbol);
+            const parsed = await parseExpenseWithAI(input, colors.currencySymbol, homeCurrencyCode);
 
             if (!parsed.amount || isNaN(parsed.amount) || parsed.amount === 0) {
                 Alert.alert('Missing Amount', `Please mention the price (e.g., 'Coffee ${colors.currencySymbol}50')`);
@@ -112,10 +113,43 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                 }
             }
 
+            let historicalPrimarySymbol: string | undefined = undefined;
+            let historicalHomeSymbol: string | undefined = undefined;
+            let historicalConvertedAmount: number | undefined = undefined;
+
+            if (parsed.isRemittance) {
+                const targetCode = parsed.remittanceCode || homeCurrencyCode;
+                const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
+                
+                historicalPrimarySymbol = colors.currencySymbol;
+                historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
+                
+                const primaryCurrencyEntry = currencies.find(c => c.currencySymbol === colors.currencySymbol);
+                const fromCode = primaryCurrencyEntry ? primaryCurrencyEntry.currencyCode : 'INR';
+                let rate = getFallbackRate(fromCode, targetCode);
+
+                try {
+                    const res = await fetch(`https://api.frankfurter.app/latest?from=${fromCode}&to=${targetCode}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.rates && data.rates[targetCode]) {
+                            rate = data.rates[targetCode];
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
+                }
+
+                historicalConvertedAmount = parseFloat((userAmount * rate).toFixed(2));
+            }
+
             addExpense({
                 ...parsed,
                 amount: userAmount, 
                 date: expenseDate,
+                historicalPrimarySymbol,
+                historicalHomeSymbol,
+                historicalConvertedAmount,
             });
 
             if (splitData) {
