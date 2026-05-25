@@ -12,12 +12,14 @@ import { ExpenseProvider } from '@/hooks/expense-store';
 import { SplitExpenseProvider } from '@/hooks/split-expense-store';
 import { FirstTimeProvider, useFirstTime } from '@/hooks/first-time-store';
 import { useNotifications } from '@/hooks/notification-store';
-import { View, ActivityIndicator, Animated, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Animated, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { useRef, useEffect, useState } from 'react';
 import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
 import FeedbackModal from '@/components/FeedbackModal';
 import { useExpenses } from '@/hooks/expense-store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HowItWorksScreen from '@/components/HowItWorksScreen';
 
 function GlobalModals() {
   const { isFeedbackModalVisible, setFeedbackModalVisible } = useExpenses();
@@ -35,75 +37,82 @@ function GlobalStatusBar() {
 }
 
 function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart: () => void }) {
-  const [showButton, setShowButton] = useState(false);
+  const [showContent, setShowContent] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('₹');
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { updateCurrencySymbol } = useTheme();
+  const { colors, isDarkMode, updateCurrencySymbol } = useTheme();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
     if (isDataReady) {
-      timeoutId = setTimeout(() => {
-        setShowButton(true);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
-      }, 1500);
+      setShowContent(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
     }
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isDataReady, fadeAnim]);
+  }, [isDataReady]);
 
   const handleStart = () => {
     updateCurrencySymbol(selectedCurrency);
     onStart();
   };
 
+  if (!showContent) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flex: 1 }}>
-      <StatusBar style="light" translucent={true} backgroundColor="transparent" />
-      <Image 
-        source={require('../assets/images/splash-icon.png')} 
-        style={StyleSheet.absoluteFill} 
-        contentFit="cover"
-        priority="high"
-      />
-      {showButton && (
-        <Animated.View style={{ opacity: fadeAnim, position: 'absolute', bottom: 50, left: 24, right: 24, alignItems: 'center' }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginBottom: 12, textShadowColor: 'rgba(0, 0, 0, 0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent={true} />
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 20 }}
+      >
+        <HowItWorksScreen scrollEnabled={false} />
+        
+        <Animated.View style={{ 
+          opacity: fadeAnim, 
+          width: '100%', 
+          padding: 24, 
+          alignItems: 'center', 
+          backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          marginTop: 20
+        }}>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 16 }}>
             Select your primary currency
           </Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
             {['₹', '$', '€', '£'].map((symbol) => {
               const isActive = selectedCurrency === symbol;
               return (
                 <TouchableOpacity
                   key={symbol}
                   style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
-                    backgroundColor: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.15)',
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: isActive ? colors.primary : colors.card,
                     justifyContent: 'center',
                     alignItems: 'center',
                     borderWidth: isActive ? 0 : 1,
-                    borderColor: 'rgba(255, 255, 255, 0.25)',
-                    shadowColor: isActive ? '#000' : 'transparent',
+                    borderColor: colors.border,
+                    shadowColor: isActive ? colors.primary : '#000',
                     shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isActive ? 0.2 : 0,
+                    shadowOpacity: isActive ? 0.25 : 0.05,
                     shadowRadius: 4,
-                    elevation: isActive ? 4 : 0,
+                    elevation: isActive ? 4 : 1,
                   }}
                   onPress={() => setSelectedCurrency(symbol)}
                 >
-                  <Text style={{ color: isActive ? '#7C3AED' : '#FFFFFF', fontSize: 20, fontWeight: '700' }}>
+                  <Text style={{ color: isActive ? '#FFFFFF' : colors.text, fontSize: 22, fontWeight: '700' }}>
                     {symbol}
                   </Text>
                 </TouchableOpacity>
@@ -112,25 +121,25 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
           </View>
           <TouchableOpacity
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: colors.primary,
               borderRadius: 16,
-              paddingVertical: 16,
+              paddingVertical: 18,
               justifyContent: 'center',
               alignItems: 'center',
               width: '100%',
-              maxWidth: 280,
-              shadowColor: '#000',
+              maxWidth: 320,
+              shadowColor: colors.primary,
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
+              shadowOpacity: 0.3,
               shadowRadius: 8,
               elevation: 5,
             }}
             onPress={handleStart}
           >
-            <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 18 }}>Get Started</Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 18 }}>Get Started</Text>
           </TouchableOpacity>
         </Animated.View>
-      )}
+      </ScrollView>
     </View>
   );
 }

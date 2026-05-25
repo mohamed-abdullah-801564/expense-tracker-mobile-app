@@ -111,7 +111,7 @@ export default function SettingsScreen() {
             try {
                 const data = await exportAllData();
                 if (data && data.expenses && Array.isArray(data.expenses)) {
-                    let report = "EXPENSE REPORT\n----------------\n";
+                    let report = "Description,Amount,Date,Category\n";
 
                     // Sort expenses by date (newest first)
                     const sortedExpenses = [...data.expenses].sort((a, b) =>
@@ -122,20 +122,17 @@ export default function SettingsScreen() {
                         if (item.isDeleted) return;
                         const dateObj = new Date(item.date);
                         const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+                        const escapedDescription = `"${item.description.replace(/"/g, '""')}"`;
 
-                        report += `Item: ${item.description}\n`;
-                        report += `Amount: ${colors.currencySymbol}${item.amount.toFixed(2)}\n`;
-                        report += `Date: ${formattedDate}\n`;
-                        report += `Category: ${item.category}\n`;
-                        report += "----------------\n";
+                        report += `${escapedDescription},${item.amount.toFixed(2)},${formattedDate},${item.category}\n`;
                     });
 
                     // Web download fallback
-                    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+                    const blob = new Blob([report], { type: 'text/csv;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = 'expenses-report.txt';
+                    link.download = 'expenses_export.csv';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
@@ -158,7 +155,7 @@ export default function SettingsScreen() {
         try {
             const data = await exportAllData();
             if (data && data.expenses && Array.isArray(data.expenses)) {
-                let report = "EXPENSE REPORT\n----------------\n";
+                let report = "Description,Amount,Date,Category\n";
 
                 // Sort expenses by date (newest first)
                 const sortedExpenses = [...data.expenses].sort((a, b) =>
@@ -169,15 +166,12 @@ export default function SettingsScreen() {
                     if (item.isDeleted) return;
                     const dateObj = new Date(item.date);
                     const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+                    const escapedDescription = `"${item.description.replace(/"/g, '""')}"`;
 
-                    report += `Item: ${item.description}\n`;
-                    report += `Amount: ${colors.currencySymbol}${item.amount.toFixed(2)}\n`;
-                    report += `Date: ${formattedDate}\n`;
-                    report += `Category: ${item.category}\n`;
-                    report += "----------------\n";
+                    report += `${escapedDescription},${item.amount.toFixed(2)},${formattedDate},${item.category}\n`;
                 });
 
-                const fileUri = FileSystem.documentDirectory + 'expenses-report.txt';
+                const fileUri = FileSystem.documentDirectory + 'expenses_export.csv';
 
                 await FileSystem.writeAsStringAsync(fileUri, report);
 

@@ -34,9 +34,10 @@ interface HowItWorksScreenProps {
     onGetStarted?: () => void;
     showGetStartedButton?: boolean;
     onClose?: () => void;
+    scrollEnabled?: boolean;
 }
 
-export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = false, onClose }: HowItWorksScreenProps) {
+export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = false, onClose, scrollEnabled = true }: HowItWorksScreenProps) {
     const { colors } = useTheme();
     const styles = createStyles(colors);
 
@@ -154,6 +155,66 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
             ],
         },
     ];
+
+    if (!scrollEnabled) {
+        return (
+            <View style={{ backgroundColor: colors.background }}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>How It Works</Text>
+                    <Text style={styles.subtitle}>
+                        Learn how to manage your finances with this expense tracking app
+                    </Text>
+                </View>
+
+                {sections.map((section, index) => (
+                    <View key={index} style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <View style={styles.iconContainer}>
+                                {section.icon}
+                            </View>
+                            <Text style={styles.sectionTitle}>{section.title}</Text>
+                        </View>
+
+                        <Text style={styles.sectionDescription}>{section.description}</Text>
+
+                        {section.steps && (
+                            <View style={styles.stepsList}>
+                                {section.steps.map((step, stepIndex) => (
+                                    <View key={stepIndex} style={styles.stepItem}>
+                                        <View style={styles.stepNumber}>
+                                            <Text style={styles.stepNumberText}>{stepIndex + 1}</Text>
+                                        </View>
+                                        <Text style={styles.stepText}>{step}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                ))}
+
+                <View style={styles.footer}>
+                    <AlertCircle size={20} color={colors.textSecondary} />
+                    <Text style={styles.footerText}>
+                        Your data is automatically saved to your device and persists across sessions.
+                        Backups are created automatically to ensure your data is safe.
+                    </Text>
+                </View>
+
+                {(showGetStartedButton || onClose) && (
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity
+                            style={styles.getStartedButton}
+                            onPress={showGetStartedButton ? onGetStarted : onClose}
+                        >
+                            <Text style={styles.getStartedButtonText}>
+                                {showGetStartedButton ? 'Got it - Start using app' : 'Back to Settings'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
