@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -7,28 +7,17 @@ import {
     SafeAreaView,
     TouchableOpacity,
     Platform,
+    LayoutAnimation,
 } from 'react-native';
 import {
     Wallet,
-    History,
+    Target,
     Users,
-    Settings,
-    Bell,
-    PlusCircle,
-    CheckCircle,
-    PieChart,
-    AlertCircle,
-    DollarSign,
-    Bot,
+    Send,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
-
-interface GuideSection {
-    icon: React.ReactElement;
-    title: string;
-    description: string;
-    steps?: string[];
-}
 
 interface HowItWorksScreenProps {
     onGetStarted?: () => void;
@@ -40,178 +29,108 @@ interface HowItWorksScreenProps {
 export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = false, onClose, scrollEnabled = true }: HowItWorksScreenProps) {
     const { colors } = useTheme();
     const styles = createStyles(colors);
+    const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-    const sections: GuideSection[] = [
+    const cards = [
         {
-            icon: <Wallet size={28} color={colors.primary} />,
-            title: 'What is this App?',
-            description: 'This is a comprehensive expense tracking app that helps you manage your finances, track spending, set budgets, split bills with friends, and stay on top of your financial goals.',
+            icon: <Wallet size={26} color={colors.primary} />,
+            title: 'Smart AI Input',
+            shortDescription: "Type expenses naturally like 'Coffee 50 morning'.",
+            detailedDescription: "Say goodbye to complex forms. Simply type your transaction details naturally, such as 'Lunch 250 food' or 'Taxi 120 transport', and our AI will automatically parse the amount, description, and category instantly.",
         },
         {
-            icon: <DollarSign size={28} color={colors.success} />,
-            title: 'Set Your Budget',
-            description: 'Start by setting a budget for a specific period to manage your spending effectively.',
-            steps: [
-                'Go to the Expenses tab',
-                'Tap "Set Budget" button',
-                'Enter budget amount and duration (e.g. "5000 for 10 days")',
-                'Type "Add 2000" to top up existing budget without resetting dates',
-                'Your budget will track spending automatically',
-            ],
+            icon: <Target size={26} color={colors.warning} />,
+            title: 'Dynamic Budgets',
+            shortDescription: 'Track spending ceilings and daily burn limits automatically.',
+            detailedDescription: "Set budget amounts and custom periods like '5000 for 10 days'. You can top up your active budget using the 'Add 2000' command, and check your remaining limit or daily burn rate at any time.",
         },
         {
-            icon: <PlusCircle size={28} color={colors.primary} />,
-            title: 'Add Expenses',
-            description: 'Track your daily spending by adding expenses with natural language.',
-            steps: [
-                'Tap the + button on the Expenses tab',
-                'Type your expense naturally (e.g., "Lunch 450 food")',
-                'Or split bills: "Dinner 800 split 4 person"',
-                'Track debts: "Lend 500 to Ram" or "Borrow 200 from Sam"',
-                'These debt transactions appear in Friends tab, not Total Expenses',
-            ],
+            icon: <Users size={26} color={colors.success} />,
+            title: 'Split with Friends',
+            shortDescription: 'Track who owes you money safely inside the Friends tab.',
+            detailedDescription: "Split bills by writing 'split 4 with John, Sarah' when adding expenses. The app records individual shares, monitors who owes you money, and helps you track and settle up debts in a single tap.",
         },
         {
-            icon: <PieChart size={28} color={colors.warning} />,
-            title: 'View Expenses',
-            description: 'Your expenses are organized and easy to view.',
-            steps: [
-                'See total spending at the top of Expenses tab',
-                'View budget progress card with remaining amount',
-                'Filter expenses by category',
-                'Each expense shows description, amount, and category',
-                'Swipe or tap to delete individual expenses',
-            ],
-        },
-        {
-            icon: <History size={28} color={colors.primary} />,
-            title: 'History Tab',
-            description: 'Track your spending over time and analyze patterns.',
-            steps: [
-                'View monthly and total expense summaries',
-                'See all expenses in chronological order',
-                'Search expenses by description or date',
-                'View budget history and transactions',
-                'Track when budgets were set or updated',
-            ],
-        },
-        {
-            icon: <Users size={28} color={colors.primary} />,
-            title: 'Friends & Split Bills',
-            description: 'Manage shared expenses and track who owes you money.',
-            steps: [
-                'Split bills by adding "split X person" when creating expense',
-                'Go to Friends tab to see all people who owe money',
-                'View each friend\'s pending amount',
-                'Mark as paid with the checkmark button when settled',
-                'Delete friend records with the trash icon',
-            ],
-        },
-        {
-            icon: <Bell size={28} color={colors.error} />,
-            title: 'Notifications',
-            description: 'Stay informed about your spending and bills.',
-            steps: [
-                'Enable notifications in Settings',
-                'Get alerts when approaching budget limit',
-                'Set up recurring bill reminders',
-                'Receive daily spending limit alerts',
-                'Budget period ending reminders',
-            ],
-        },
-        {
-            icon: <PieChart size={28} color={colors.primary} />,
-            title: 'Spending Insights',
-            description: 'Visualize your spending habits with the new Insights tab.',
-            steps: [
-                'View a Donut Chart of your monthly spending',
-                'See category breakdown with percentages and totals',
-                'Toggle between months to compare spending',
-                'Track progress bars for each category',
-            ],
-        },
-        {
-            icon: <Bot size={28} color={colors.primary} />,
-            title: 'AI Financial Assistant',
-            description: 'Get personalized insights and help with your finances.',
-            steps: [
-                'Double-tap anywhere on the screen to trigger the AI',
-                'Ask about your spending distribution: "How much did I spend on Snacks?"',
-                'Get help with budgeting and financial goals',
-                'Analyze your budget history through conversational AI',
-            ],
-        },
-        {
-            icon: <CheckCircle size={28} color={colors.success} />,
-            title: 'Quick Tips',
-            description: 'Get the most out of your expense tracker.',
-            steps: [
-                'Use natural language: "Coffee 80 snacks" or "Tea 20" works perfectly',
-                'Double-tap to quickly chat with your AI assistant',
-                'View Budget History and transactions in the History tab',
-                'Use "Snacks" for hot items (tea/coffee) and "Drinks" for cold items (water/juice/soda).',
-                'Set realistic budgets to avoid overspending',
-                'Check Insights regularly to understand spending patterns',
-            ],
+            icon: <Send size={26} color={colors.primary} />,
+            title: 'Global Remittances',
+            shortDescription: 'View dynamic home currency conversions for international transfers.',
+            detailedDescription: "Remit money and view conversion estimates instantly. Our integration fetches real-time Frankfurter API exchange rates from your local active currency code directly to your home currency code.",
         },
     ];
 
+    const toggleExpand = (index: number) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpandedIndex(expandedIndex === index ? null : index);
+    };
+
+    const content = (
+        <View style={styles.innerContainer}>
+            <View style={styles.header}>
+                <Text style={styles.title}>How It Works</Text>
+                <Text style={styles.subtitle}>
+                    Master your finances with four elegant, powerful tools
+                </Text>
+            </View>
+
+            <View style={styles.rowsContainer}>
+                {cards.map((card, index) => {
+                    const isExpanded = expandedIndex === index;
+                    return (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.row,
+                                isExpanded && styles.rowExpanded
+                            ]}
+                            onPress={() => toggleExpand(index)}
+                            activeOpacity={0.9}
+                        >
+                            <View style={styles.rowTop}>
+                                <View style={styles.iconContainer}>
+                                    {card.icon}
+                                </View>
+                                <View style={styles.textContainer}>
+                                    <Text style={styles.rowTitle}>{card.title}</Text>
+                                    <Text style={styles.rowDescription}>{card.shortDescription}</Text>
+                                </View>
+                                <View style={styles.chevronContainer}>
+                                    {isExpanded ? (
+                                        <ChevronUp size={20} color={colors.textSecondary} />
+                                    ) : (
+                                        <ChevronDown size={20} color={colors.textSecondary} />
+                                    )}
+                                </View>
+                            </View>
+                            {isExpanded && (
+                                <View style={styles.rowDetail}>
+                                    <Text style={styles.detailText}>{card.detailedDescription}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+
+            {(showGetStartedButton || onClose) && (
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={showGetStartedButton ? onGetStarted : onClose}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.actionButtonText}>
+                            {showGetStartedButton ? 'Got it - Start using app' : 'Back to Settings'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+        </View>
+    );
+
     if (!scrollEnabled) {
         return (
-            <View style={{ backgroundColor: colors.background }}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>How It Works</Text>
-                    <Text style={styles.subtitle}>
-                        Learn how to manage your finances with this expense tracking app
-                    </Text>
-                </View>
-
-                {sections.map((section, index) => (
-                    <View key={index} style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.iconContainer}>
-                                {section.icon}
-                            </View>
-                            <Text style={styles.sectionTitle}>{section.title}</Text>
-                        </View>
-
-                        <Text style={styles.sectionDescription}>{section.description}</Text>
-
-                        {section.steps && (
-                            <View style={styles.stepsList}>
-                                {section.steps.map((step, stepIndex) => (
-                                    <View key={stepIndex} style={styles.stepItem}>
-                                        <View style={styles.stepNumber}>
-                                            <Text style={styles.stepNumberText}>{stepIndex + 1}</Text>
-                                        </View>
-                                        <Text style={styles.stepText}>{step}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </View>
-                ))}
-
-                <View style={styles.footer}>
-                    <AlertCircle size={20} color={colors.textSecondary} />
-                    <Text style={styles.footerText}>
-                        Your data is automatically saved to your device and persists across sessions.
-                        Backups are created automatically to ensure your data is safe.
-                    </Text>
-                </View>
-
-                {(showGetStartedButton || onClose) && (
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={styles.getStartedButton}
-                            onPress={showGetStartedButton ? onGetStarted : onClose}
-                        >
-                            <Text style={styles.getStartedButtonText}>
-                                {showGetStartedButton ? 'Got it - Start using app' : 'Back to Settings'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+            <View style={styles.container}>
+                {content}
             </View>
         );
     }
@@ -223,59 +142,7 @@ export default function HowItWorksScreen({ onGetStarted, showGetStartedButton = 
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.header}>
-                    <Text style={styles.title}>How It Works</Text>
-                    <Text style={styles.subtitle}>
-                        Learn how to manage your finances with this expense tracking app
-                    </Text>
-                </View>
-
-                {sections.map((section, index) => (
-                    <View key={index} style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.iconContainer}>
-                                {section.icon}
-                            </View>
-                            <Text style={styles.sectionTitle}>{section.title}</Text>
-                        </View>
-
-                        <Text style={styles.sectionDescription}>{section.description}</Text>
-
-                        {section.steps && (
-                            <View style={styles.stepsList}>
-                                {section.steps.map((step, stepIndex) => (
-                                    <View key={stepIndex} style={styles.stepItem}>
-                                        <View style={styles.stepNumber}>
-                                            <Text style={styles.stepNumberText}>{stepIndex + 1}</Text>
-                                        </View>
-                                        <Text style={styles.stepText}>{step}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </View>
-                ))}
-
-                <View style={styles.footer}>
-                    <AlertCircle size={20} color={colors.textSecondary} />
-                    <Text style={styles.footerText}>
-                        Your data is automatically saved to your device and persists across sessions.
-                        Backups are created automatically to ensure your data is safe.
-                    </Text>
-                </View>
-
-                {(showGetStartedButton || onClose) && (
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={styles.getStartedButton}
-                            onPress={showGetStartedButton ? onGetStarted : onClose}
-                        >
-                            <Text style={styles.getStartedButtonText}>
-                                {showGetStartedButton ? 'Got it - Start using app' : 'Back to Settings'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {content}
             </ScrollView>
         </SafeAreaView>
     );
@@ -290,129 +157,117 @@ const createStyles = (colors: any) => StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 40,
+        flexGrow: 1,
+    },
+    innerContainer: {
+        flex: 1,
+        paddingHorizontal: 24,
+        justifyContent: 'center',
+        paddingVertical: 32,
     },
     header: {
-        paddingHorizontal: 20,
-        paddingVertical: 24,
-        paddingTop: Platform.OS === 'android' ? 40 : 20,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        alignItems: 'center',
+        marginBottom: 36,
+        marginTop: Platform.OS === 'android' ? 24 : 0,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '700',
+        fontSize: 32,
+        fontWeight: '800',
         color: colors.text,
-        marginBottom: 8,
+        marginBottom: 10,
+        textAlign: 'center',
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
         color: colors.textSecondary,
+        textAlign: 'center',
         lineHeight: 22,
+        paddingHorizontal: 12,
     },
-    section: {
-        marginHorizontal: 20,
-        marginTop: 20,
+    rowsContainer: {
+        gap: 20,
+        marginBottom: 40,
+    },
+    row: {
         backgroundColor: colors.card,
-        borderRadius: 16,
+        borderRadius: 20,
         padding: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 3,
     },
-    sectionHeader: {
+    rowExpanded: {
+        borderColor: colors.primary,
+    },
+    rowTop: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
     },
     iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: colors.border,
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: colors.background,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
-    sectionTitle: {
+    textContainer: {
         flex: 1,
-        fontSize: 20,
+        justifyContent: 'center',
+    },
+    rowTitle: {
+        fontSize: 18,
         fontWeight: '700',
         color: colors.text,
+        marginBottom: 4,
     },
-    sectionDescription: {
-        fontSize: 15,
-        lineHeight: 22,
-        color: colors.textSecondary,
-        marginBottom: 16,
-    },
-    stepsList: {
-        gap: 12,
-    },
-    stepItem: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    stepNumber: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-        marginTop: 2,
-    },
-    stepNumberText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.surface,
-    },
-    stepText: {
-        flex: 1,
+    rowDescription: {
         fontSize: 14,
-        lineHeight: 20,
-        color: colors.text,
-    },
-    footer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginHorizontal: 20,
-        marginTop: 24,
-        padding: 16,
-        backgroundColor: colors.card,
-        borderRadius: 12,
-        gap: 12,
-    },
-    footerText: {
-        flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
         color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    chevronContainer: {
+        marginLeft: 8,
+    },
+    rowDetail: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+    },
+    detailText: {
+        fontSize: 14,
+        color: colors.text,
+        lineHeight: 22,
     },
     buttonContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        paddingBottom: 40,
+        marginTop: 'auto',
+        width: '100%',
+        paddingVertical: 12,
     },
-    getStartedButton: {
+    actionButton: {
         backgroundColor: colors.primary,
         borderRadius: 16,
-        paddingVertical: 18,
+        paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 6,
     },
-    getStartedButtonText: {
-        fontSize: 18,
+    actionButtonText: {
+        fontSize: 16,
         fontWeight: '700',
-        color: colors.surface,
+        color: '#FFFFFF',
     },
 });

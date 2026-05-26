@@ -178,8 +178,8 @@ function fallbackParser(input: string, currencySymbol: string = '₹', homeCurre
     // Basic keyword-based categorization
     const lowerInput = input.toLowerCase();
     
-    // Explicit variations to match: "sent", "send", "transfer", "remit", "remittance", "sent home", "to family", "to mom", "to dad"
-    const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "sent home", "to family", "to mom", "to dad"];
+    // Explicit variations to match: "sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"
+    const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"];
     const isRemittance = remittanceKeywords.some(keyword => lowerInput.includes(keyword));
 
     let category: ParsedExpense['category'] = 'Other';

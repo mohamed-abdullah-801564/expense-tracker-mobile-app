@@ -76,17 +76,24 @@ export default function InsightsScreen() {
         let grandTotal = 0;
 
         filteredExpenses.forEach(exp => {
-            totals[exp.category] = (totals[exp.category] || 0) + exp.amount;
+            const category = exp.isRemittance ? 'Remittance' : exp.category;
+            totals[category] = (totals[category] || 0) + exp.amount;
             grandTotal += exp.amount;
         });
 
         const sortedStats = Object.entries(totals)
-            .map(([category, total]) => ({
-                category,
-                total,
-                percentage: grandTotal > 0 ? (total / grandTotal) * 100 : 0,
-                color: CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.Other,
-            }))
+            .map(([category, total]) => {
+                let color = CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.Other;
+                if (category === 'Remittance') {
+                    color = '#8B5CF6';
+                }
+                return {
+                    category,
+                    total,
+                    percentage: grandTotal > 0 ? (total / grandTotal) * 100 : 0,
+                    color,
+                };
+            })
             .sort((a, b) => b.total - a.total);
 
         return {
