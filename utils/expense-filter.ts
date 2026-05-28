@@ -3,6 +3,7 @@ import { Expense } from '@/types/expense';
 export type FilterType = 'This Month' | 'Total Expenses';
 
 export interface FilteredExpenseResult {
+    id?: string;
     amount: number;
     description: string;
     category: string;
@@ -15,6 +16,7 @@ export interface FilteredExpenseResult {
     historicalPrimarySymbol?: string;
     historicalHomeSymbol?: string;
     historicalConvertedAmount?: number;
+    items?: Array<{ name: string; qty: number; total: number }>;
 }
 
 export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult {
@@ -39,6 +41,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
     }
 
     return {
+        id: expense.id,
         amount: expense.amount,
         description: expense.description,
         category: expense.category,
@@ -51,6 +54,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
         historicalPrimarySymbol: expense.historicalPrimarySymbol,
         historicalHomeSymbol: expense.historicalHomeSymbol,
         historicalConvertedAmount: expense.historicalConvertedAmount,
+        items: expense.items,
     };
 }
 

@@ -216,56 +216,107 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             try {
                 const expenseDate = new Date().toISOString();
                 
-                // Save each item as a separate expense
+                // Calculate total sum of all item prices combined
+                const totalSum = scannedData.items.reduce((sum, item) => sum + parseFloat(item.price), 0);
+
+                // Group duplicate scanned items, counting their frequency/quantity
+                interface GroupedItem {
+                    name: string;
+                    qty: number;
+                    totalPrice: number;
+                }
+                const groupedMap = new Map<string, GroupedItem>();
+
                 for (const item of scannedData.items) {
-                    const priceNum = parseFloat(item.price);
-                    const isRemittance = item.category === 'Remittance';
+                    const name = item.itemName.trim();
+                    if (!name) continue;
+                    const price = parseFloat(item.price) || 0;
 
-                    let historicalPrimarySymbol: string | undefined = undefined;
-                    let historicalHomeSymbol: string | undefined = undefined;
-                    let historicalConvertedAmount: number | undefined = undefined;
+                    const existing = groupedMap.get(name);
+                    if (existing) {
+                        existing.qty += 1;
+                        existing.totalPrice = parseFloat((existing.totalPrice + price).toFixed(2));
+                    } else {
+                        groupedMap.set(name, {
+                            name,
+                            qty: 1,
+                            totalPrice: price
+                        });
+                    }
+                }
 
-                    if (isRemittance) {
-                        const targetCode = homeCurrencyCode;
-                        const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
-                        const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
-                        const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
-                        
-                        historicalPrimarySymbol = colors.currencySymbol;
-                        historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
-                        
-                        let rate = getFallbackRate(primaryCode, targetCode);
+                const groupedItems = Array.from(groupedMap.values());
 
-                        try {
-                            const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                if (data.rates && data.rates[targetCode]) {
-                                    rate = data.rates[targetCode];
-                                }
+                // Format description string: "Item Name (xQuantity)"
+                const itemDescriptions = groupedItems.map(i => i.qty > 1 ? `${i.name} (x${i.qty})` : i.name);
+                const combinedDescription = itemDescriptions.join(', ') + ' (Receipt Scan)';
+
+                // Determine dominant category from the items list
+                const categoryCounts: Record<string, number> = {};
+                let maxCount = 0;
+                let dominantCategory = 'Other';
+
+                const cleanCategories = scannedData.items.map(item => {
+                    const cat = item.category === 'Others' ? 'Other' : item.category;
+                    return cat || 'Other';
+                });
+
+                for (const cat of cleanCategories) {
+                    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+                }
+
+                for (const cat of cleanCategories) {
+                    if (categoryCounts[cat] > maxCount) {
+                        maxCount = categoryCounts[cat];
+                        dominantCategory = cat;
+                    }
+                }
+
+                const finalCategory = dominantCategory as any;
+                const isRemittance = finalCategory === 'Remittance';
+
+                let historicalPrimarySymbol: string | undefined = undefined;
+                let historicalHomeSymbol: string | undefined = undefined;
+                let historicalConvertedAmount: number | undefined = undefined;
+
+                if (isRemittance) {
+                    const targetCode = homeCurrencyCode;
+                    const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
+                    const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
+                    const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
+                    
+                    historicalPrimarySymbol = colors.currencySymbol;
+                    historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
+                    
+                    let rate = getFallbackRate(primaryCode, targetCode);
+
+                    try {
+                        const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.rates && data.rates[targetCode]) {
+                                rate = data.rates[targetCode];
                             }
-                        } catch (e) {
-                            console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
                         }
-
-                        historicalConvertedAmount = parseFloat((priceNum * rate).toFixed(2));
+                    } catch (e) {
+                        console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
                     }
 
-                    // Clean category: if it's 'Others', map it to 'Other'
-                    const finalCategory = (item.category === 'Others' ? 'Other' : item.category) as any;
-
-                    addExpense({
-                        amount: priceNum,
-                        description: item.itemName,
-                        category: finalCategory,
-                        date: expenseDate,
-                        isRemittance,
-                        remittanceCode: isRemittance ? homeCurrencyCode : undefined,
-                        historicalPrimarySymbol,
-                        historicalHomeSymbol,
-                        historicalConvertedAmount,
-                    });
+                    historicalConvertedAmount = parseFloat((totalSum * rate).toFixed(2));
                 }
+
+                addExpense({
+                    amount: totalSum,
+                    description: combinedDescription,
+                    category: finalCategory,
+                    date: expenseDate,
+                    isRemittance,
+                    remittanceCode: isRemittance ? homeCurrencyCode : undefined,
+                    historicalPrimarySymbol,
+                    historicalHomeSymbol,
+                    historicalConvertedAmount,
+                    items: groupedItems.map(i => ({ name: i.name, qty: i.qty, total: i.totalPrice })),
+                });
 
                 setScannedData(null);
                 setInput('');
@@ -544,7 +595,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                                         style={[styles.button, { backgroundColor: colors.primary }]}
                                         onPress={handleSubmit}
                                     >
-                                        <Text style={styles.buttonText}>Save Expenses</Text>
+                                        <Text style={styles.buttonText}>Save Expense</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.cancelButton, { borderColor: colors.border }]}

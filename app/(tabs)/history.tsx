@@ -7,8 +7,15 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Modal,
+    LayoutAnimation,
+    Platform,
+    UIManager,
 } from 'react-native';
-import { Calendar, Clock, Filter, History as HistoryIcon } from 'lucide-react-native';
+import { Calendar, Clock, Filter, History as HistoryIcon, ChevronDown, ChevronUp } from 'lucide-react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { FilterType, filterExpensesByType, FilteredExpenseResult } from '@/utils/expense-filter';
@@ -24,6 +31,15 @@ export default function HistoryScreen() {
     const { colors, currencyCode, homeCurrencyCode } = useTheme();
     const [selectedFilter, setSelectedFilter] = useState<FilterType>('This Month');
     const [showHistory, setShowHistory] = useState(false);
+    const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+    const toggleItemExpanded = useCallback((id: string) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpandedItems(prev => ({
+            ...prev,
+            [id]: !prev[id],
+        }));
+    }, []);
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         searchText: '',
         category: 'All',
@@ -57,8 +73,17 @@ export default function HistoryScreen() {
             displayConvertedAmount = (item.amount * rate).toFixed(2);
         }
 
+        const hasItems = !!(item.items && item.items.length > 0);
+        const isExpanded = !!(item.id && expandedItems[item.id]);
+
+        const CardComponent = hasItems ? TouchableOpacity : View;
+        const cardProps = hasItems ? {
+            activeOpacity: 0.7,
+            onPress: () => item.id && toggleItemExpanded(item.id),
+        } : {};
+
         return (
-            <View style={[styles.expenseItem, item.isDeleted && styles.deletedItem]}>
+            <CardComponent style={[styles.expenseItem, item.isDeleted && styles.deletedItem]} {...cardProps}>
                 <View style={styles.expenseHeader}>
                     <View style={styles.expenseInfo}>
                         <Text style={[styles.expenseDescription, item.isDeleted && styles.deletedText]}>
@@ -66,14 +91,25 @@ export default function HistoryScreen() {
                         </Text>
                         <Text style={styles.expenseCategory}>{item.category}</Text>
                     </View>
-                    <View style={styles.amountContainer}>
-                        <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
-                            {colors.currencySymbol}{item.amount.toFixed(2)}
-                        </Text>
-                        {item.isRemittance && (
-                            <Text style={styles.remittanceSubtext}>
-                                ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={styles.amountContainer}>
+                            <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
+                                {colors.currencySymbol}{item.amount.toFixed(2)}
                             </Text>
+                            {item.isRemittance && (
+                                <Text style={styles.remittanceSubtext}>
+                                    ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                                </Text>
+                            )}
+                        </View>
+                        {hasItems && (
+                            <View style={{ paddingLeft: 4 }}>
+                                {isExpanded ? (
+                                    <ChevronUp size={18} color={colors.textSecondary} />
+                                ) : (
+                                    <ChevronDown size={18} color={colors.textSecondary} />
+                                )}
+                            </View>
                         )}
                     </View>
                 </View>
@@ -90,9 +126,31 @@ export default function HistoryScreen() {
                     </View>
                     <Text style={styles.expenseMonthYear}>{item.month} {item.year}</Text>
                 </View>
-            </View>
+                {hasItems && isExpanded && (
+                    <View style={styles.subTableContainer}>
+                        <View style={styles.subTableHeader}>
+                            <Text style={[styles.subTableHeaderText, { flex: 2, color: colors.textSecondary }]}>Item</Text>
+                            <Text style={[styles.subTableHeaderText, { flex: 0.5, textAlign: 'center', color: colors.textSecondary }]}>Qty</Text>
+                            <Text style={[styles.subTableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Price</Text>
+                        </View>
+                        {item.items?.map((subItem, idx) => (
+                            <View key={idx} style={styles.subTableRow}>
+                                <Text style={[styles.subTableRowText, { flex: 2, color: colors.text }]} numberOfLines={1}>
+                                    {subItem.name}
+                                </Text>
+                                <Text style={[styles.subTableRowText, { flex: 0.5, textAlign: 'center', color: colors.textSecondary }]}>
+                                    {subItem.qty}
+                                </Text>
+                                <Text style={[styles.subTableRowText, { flex: 1, textAlign: 'right', color: colors.text }]}>
+                                    {colors.currencySymbol}{subItem.total.toFixed(2)}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+            </CardComponent>
         );
-    }, [colors, styles, currencyCode, homeCurrencyCode]);
+    }, [colors, styles, currencyCode, homeCurrencyCode, expandedItems, toggleItemExpanded]);
 
     if (isLoading) {
         return (
@@ -164,11 +222,6 @@ export default function HistoryScreen() {
                 windowSize={10}
                 removeClippedSubviews={true}
                 updateCellsBatchingPeriod={50}
-                getItemLayout={(data, index) => ({
-                    length: 100,
-                    offset: 100 * index,
-                    index,
-                })}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No expenses found</Text>
@@ -418,5 +471,30 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         fontStyle: 'italic',
         marginTop: 2,
+    },
+    subTableContainer: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        gap: 6,
+    },
+    subTableHeader: {
+        flexDirection: 'row',
+        paddingBottom: 4,
+        marginBottom: 4,
+    },
+    subTableHeaderText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    subTableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 2,
+    },
+    subTableRowText: {
+        fontSize: 13,
+        fontWeight: '500',
     },
 });

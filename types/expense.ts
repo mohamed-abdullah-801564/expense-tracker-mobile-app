@@ -15,6 +15,7 @@ export interface Expense {
     historicalPrimarySymbol?: string;
     historicalHomeSymbol?: string;
     historicalConvertedAmount?: number;
+    items?: Array<{ name: string; qty: number; total: number }>;
 }
 
 export type ExpenseCategory =
@@ -49,6 +50,7 @@ export interface ParsedExpense {
     historicalPrimarySymbol?: string;
     historicalHomeSymbol?: string;
     historicalConvertedAmount?: number;
+    items?: Array<{ name: string; qty: number; total: number }>;
 }
 
 export interface Budget {
