@@ -108,7 +108,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
         if (!limitCheck.allowed) {
             Alert.alert(
                 "Limit Reached",
-                "Daily scan limit reached (5/5). Please type your expense manually or try again tomorrow."
+                "Daily scan limit reached (3/3). Please type your expense manually or try again tomorrow."
             );
             return;
         }
@@ -152,7 +152,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
         if (!limitCheck.allowed) {
             Alert.alert(
                 "Limit Reached",
-                "Daily scan limit reached (5/5). Please type your expense manually or try again tomorrow."
+                "Daily scan limit reached (3/3). Please type your expense manually or try again tomorrow."
             );
             return;
         }

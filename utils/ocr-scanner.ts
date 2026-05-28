@@ -17,7 +17,7 @@ export async function checkDailyScanLimit(): Promise<{ allowed: boolean; count: 
             return { allowed: true, count: 0 };
         }
 
-        if (count >= 5) {
+        if (count >= 3) {
             return { allowed: false, count };
         }
 
