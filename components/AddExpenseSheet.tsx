@@ -216,80 +216,21 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             try {
                 const expenseDate = new Date().toISOString();
                 
-                // Calculate total sum of all item prices combined
-                const totalSum = scannedData.items.reduce((sum, item) => sum + parseFloat(item.price), 0);
-
-                // Group duplicate scanned items, counting their frequency/quantity
-                interface GroupedItem {
-                    name: string;
-                    qty: number;
-                    totalPrice: number;
-                }
-                const groupedMap = new Map<string, GroupedItem>();
-
-                for (const item of scannedData.items) {
-                    const name = item.itemName.trim();
-                    if (!name) continue;
-                    const price = parseFloat(item.price) || 0;
-
-                    const existing = groupedMap.get(name);
-                    if (existing) {
-                        existing.qty += 1;
-                        existing.totalPrice = parseFloat((existing.totalPrice + price).toFixed(2));
-                    } else {
-                        groupedMap.set(name, {
-                            name,
-                            qty: 1,
-                            totalPrice: price
-                        });
-                    }
-                }
-
-                const groupedItems = Array.from(groupedMap.values());
-
-                // Format description string: "Item Name (xQuantity)"
-                const itemDescriptions = groupedItems.map(i => i.qty > 1 ? `${i.name} (x${i.qty})` : i.name);
-                const combinedDescription = itemDescriptions.join(', ') + ' (Receipt Scan)';
-
-                // Determine dominant category from the items list
-                const categoryCounts: Record<string, number> = {};
-                let maxCount = 0;
-                let dominantCategory = 'Other';
-
-                const cleanCategories = scannedData.items.map(item => {
+                // Fetch rate once if any items are Remittance
+                const hasRemittance = scannedData.items.some(item => {
                     const cat = item.category === 'Others' ? 'Other' : item.category;
-                    return cat || 'Other';
+                    return cat === 'Remittance';
                 });
-
-                for (const cat of cleanCategories) {
-                    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-                }
-
-                for (const cat of cleanCategories) {
-                    if (categoryCounts[cat] > maxCount) {
-                        maxCount = categoryCounts[cat];
-                        dominantCategory = cat;
-                    }
-                }
-
-                const finalCategory = dominantCategory as any;
-                const isRemittance = finalCategory === 'Remittance';
-
-                let historicalPrimarySymbol: string | undefined = undefined;
-                let historicalHomeSymbol: string | undefined = undefined;
-                let historicalConvertedAmount: number | undefined = undefined;
-
-                if (isRemittance) {
-                    const targetCode = homeCurrencyCode;
-                    const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
-                    const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
-                    const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
-                    
-                    historicalPrimarySymbol = colors.currencySymbol;
-                    historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
-                    
-                    let rate = getFallbackRate(primaryCode, targetCode);
-
+                
+                const targetCode = homeCurrencyCode;
+                const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
+                const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
+                const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
+                const historicalPrimarySymbol = colors.currencySymbol;
+                const historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
+                
+                let rate = getFallbackRate(primaryCode, targetCode);
+                if (hasRemittance) {
                     try {
                         const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
                         if (res.ok) {
@@ -301,22 +242,38 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     } catch (e) {
                         console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
                     }
-
-                    historicalConvertedAmount = parseFloat((totalSum * rate).toFixed(2));
                 }
 
-                addExpense({
-                    amount: totalSum,
-                    description: combinedDescription,
-                    category: finalCategory,
-                    date: expenseDate,
-                    isRemittance,
-                    remittanceCode: isRemittance ? homeCurrencyCode : undefined,
-                    historicalPrimarySymbol,
-                    historicalHomeSymbol,
-                    historicalConvertedAmount,
-                    items: groupedItems.map(i => ({ name: i.name, qty: i.qty, total: i.totalPrice })),
-                });
+                const sharedGroupId = 'group_' + Date.now();
+
+                // Loop through items and call addExpense() independently
+                for (const item of scannedData.items) {
+                    const price = parseFloat(item.price) || 0;
+                    const name = item.itemName.trim() || 'Scanned Item';
+                    const cat = (item.category === 'Others' ? 'Other' : item.category) || 'Other';
+                    const isRemittance = cat === 'Remittance';
+
+                    let itemConverted: number | undefined = undefined;
+                    if (isRemittance) {
+                        itemConverted = parseFloat((price * rate).toFixed(2));
+                    }
+
+                    addExpense({
+                        amount: price,
+                        description: name,
+                        category: cat as any,
+                        groupId: sharedGroupId,
+                        date: expenseDate,
+                        isRemittance,
+                        remittanceCode: isRemittance ? homeCurrencyCode : undefined,
+                        historicalPrimarySymbol: isRemittance ? historicalPrimarySymbol : undefined,
+                        historicalHomeSymbol: isRemittance ? historicalHomeSymbol : undefined,
+                        historicalConvertedAmount: itemConverted,
+                    });
+
+                    // Asynchronous delay to prevent state override race conditions
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
 
                 setScannedData(null);
                 setInput('');
@@ -389,82 +346,141 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             const expenseDate = new Date().toISOString();
             const expenseId = Date.now().toString();
 
-            let splitData: ParsedSplitWithNames | null = null;
-            try {
-                splitData = parseSplitExpense(input);
-            } catch (e) {
-                console.error('Split parser failed:', e);
-            }
-
-            let userAmount = parsed.amount;
-
-            if (splitData) {
-                try {
-                    const totalFriendsShare = splitData.amountPerPerson * (splitData.splitCount - 1);
-                    userAmount = parsed.amount - totalFriendsShare;
-                } catch (e) {
-                    console.error('Calculation share failed:', e);
-                    splitData = null; // Revert to normal expense if share calc fails
-                }
-            }
-
-            let historicalPrimarySymbol: string | undefined = undefined;
-            let historicalHomeSymbol: string | undefined = undefined;
-            let historicalConvertedAmount: number | undefined = undefined;
-
-            if (parsed.category === 'Remittance') {
-                parsed.isRemittance = true;
-            }
-
-            if (parsed.isRemittance) {
-                const targetCode = parsed.remittanceCode || homeCurrencyCode;
+            if (parsed.items && parsed.items.length > 0) {
+                // Multi-item text entry path
+                // Fetch rate once if any items are Remittance
+                const hasRemittance = parsed.items.some(item => item.category === 'Remittance');
+                const targetCode = homeCurrencyCode;
                 const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
-                
-                // Map the active symbol to its 3-letter currency code by looking it up in currencies list using currencyCountryName state
                 const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
                 const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
-                
-                historicalPrimarySymbol = colors.currencySymbol;
-                historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
+                const historicalPrimarySymbol = colors.currencySymbol;
+                const historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
                 
                 let rate = getFallbackRate(primaryCode, targetCode);
-
-                try {
-                    const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.rates && data.rates[targetCode]) {
-                            rate = data.rates[targetCode];
+                if (hasRemittance) {
+                    try {
+                        const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.rates && data.rates[targetCode]) {
+                                rate = data.rates[targetCode];
+                            }
                         }
+                    } catch (e) {
+                        console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
                     }
-                } catch (e) {
-                    console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
                 }
 
-                historicalConvertedAmount = parseFloat((userAmount * rate).toFixed(2));
-            }
+                const sharedGroupId = 'group_' + Date.now();
 
-            addExpense({
-                ...parsed,
-                amount: userAmount, 
-                date: expenseDate,
-                historicalPrimarySymbol,
-                historicalHomeSymbol,
-                historicalConvertedAmount,
-            });
+                // Loop through parsed items and call addExpense() independently
+                for (const subItem of parsed.items) {
+                    const price = subItem.total || 0;
+                    const name = subItem.name.trim() || 'Item';
+                    const cat = subItem.category || 'Other';
+                    const isRemittance = cat === 'Remittance';
 
-            if (splitData) {
+                    let itemConverted: number | undefined = undefined;
+                    if (isRemittance) {
+                        itemConverted = parseFloat((price * rate).toFixed(2));
+                    }
+
+                    addExpense({
+                        amount: price,
+                        description: name,
+                        category: cat as any,
+                        groupId: sharedGroupId,
+                        date: expenseDate,
+                        isRemittance,
+                        remittanceCode: isRemittance ? homeCurrencyCode : undefined,
+                        historicalPrimarySymbol: isRemittance ? historicalPrimarySymbol : undefined,
+                        historicalHomeSymbol: isRemittance ? historicalHomeSymbol : undefined,
+                        historicalConvertedAmount: itemConverted,
+                    });
+
+                    // Asynchronous 50ms delay to prevent state override race conditions
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+            } else {
+                // Existing single expense path
+                let splitData: ParsedSplitWithNames | null = null;
                 try {
-                    const splits = createSplitExpenses(splitData, expenseId, expenseDate, splitData.friendNames);
-                    addSplitExpenses(splits);
-                    Alert.alert(
-                        'Split Expense Added',
-                        `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ${colors.currencySymbol}${splitData.amountPerPerson.toFixed(2)} each.`,
-                        [{ text: 'OK' }]
-                    );
+                    splitData = parseSplitExpense(input);
                 } catch (e) {
-                    console.error('Add split expenses failed:', e);
-                    Alert.alert('Partially Saved', 'Main expense saved, but failed to record the splits.');
+                    console.error('Split parser failed:', e);
+                }
+
+                let userAmount = parsed.amount;
+
+                if (splitData) {
+                    try {
+                        const totalFriendsShare = splitData.amountPerPerson * (splitData.splitCount - 1);
+                        userAmount = parsed.amount - totalFriendsShare;
+                    } catch (e) {
+                        console.error('Calculation share failed:', e);
+                        splitData = null; // Revert to normal expense if share calc fails
+                    }
+                }
+
+                let historicalPrimarySymbol: string | undefined = undefined;
+                let historicalHomeSymbol: string | undefined = undefined;
+                let historicalConvertedAmount: number | undefined = undefined;
+
+                if (parsed.category === 'Remittance') {
+                    parsed.isRemittance = true;
+                }
+
+                if (parsed.isRemittance) {
+                    const targetCode = parsed.remittanceCode || homeCurrencyCode;
+                    const matchedCountry = currencies.find(c => c.currencyCode === targetCode);
+                    
+                    // Map the active symbol to its 3-letter currency code by looking it up in currencies list using currencyCountryName state
+                    const activeCurrencyEntry = currencies.find(c => c.countryName === currencyCountryName);
+                    const primaryCode = activeCurrencyEntry ? activeCurrencyEntry.currencyCode : 'INR';
+                    
+                    historicalPrimarySymbol = colors.currencySymbol;
+                    historicalHomeSymbol = matchedCountry ? matchedCountry.currencySymbol : targetCode;
+                    
+                    let rate = getFallbackRate(primaryCode, targetCode);
+
+                    try {
+                        const res = await fetch(`https://api.frankfurter.app/latest?from=${primaryCode}&to=${targetCode}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.rates && data.rates[targetCode]) {
+                                rate = data.rates[targetCode];
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch real-time rate for snapshot lock, using fallback:', e);
+                    }
+
+                    historicalConvertedAmount = parseFloat((userAmount * rate).toFixed(2));
+                }
+
+                addExpense({
+                    ...parsed,
+                    amount: userAmount, 
+                    date: expenseDate,
+                    historicalPrimarySymbol,
+                    historicalHomeSymbol,
+                    historicalConvertedAmount,
+                });
+
+                if (splitData) {
+                    try {
+                        const splits = createSplitExpenses(splitData, expenseId, expenseDate, splitData.friendNames);
+                        addSplitExpenses(splits);
+                        Alert.alert(
+                            'Split Expense Added',
+                            `Expense split among ${splitData.splitCount} people. ${splitData.splitCount - 1} friend(s) owe ${colors.currencySymbol}${splitData.amountPerPerson.toFixed(2)} each.`,
+                            [{ text: 'OK' }]
+                        );
+                    } catch (e) {
+                        console.error('Add split expenses failed:', e);
+                        Alert.alert('Partially Saved', 'Main expense saved, but failed to record the splits.');
+                    }
                 }
             }
 

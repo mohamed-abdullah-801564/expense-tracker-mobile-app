@@ -148,11 +148,20 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                     </View>
                 )}
 
+                {expense.isRemittance && (
+                    <View style={styles.remittanceContainer}>
+                        <Text style={styles.date}>{formatDate(expense.date)}</Text>
+                        <Text style={styles.remittanceSubtext}>
+                            ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.metaContainer}>
                     <Text style={[styles.category, { color: categoryColor }]}>
                         {expense.category}
                     </Text>
-                    <Text style={styles.date}>{formatDate(expense.date)}</Text>
+                    {!expense.isRemittance && <Text style={styles.date}>{formatDate(expense.date)}</Text>}
                     {expense.time && (
                         <Text style={styles.time}>{expense.time}</Text>
                     )}
@@ -161,11 +170,6 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
 
             <View style={styles.amountContainer}>
                 <Text style={styles.amount}>{colors.currencySymbol}{expense.amount.toFixed(2)}</Text>
-                {expense.isRemittance && (
-                    <Text style={styles.remittanceSubtext}>
-                        ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
-                    </Text>
-                )}
             </View>
         </TouchableOpacity>
     );
@@ -176,7 +180,8 @@ const createStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.card,
-        padding: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
         marginHorizontal: 16,
         marginVertical: 6,
         borderRadius: 12,
@@ -230,6 +235,12 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: colors.text,
+    },
+    remittanceContainer: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        marginVertical: 4,
+        gap: 2,
     },
     remittanceSubtext: {
         fontSize: 12,

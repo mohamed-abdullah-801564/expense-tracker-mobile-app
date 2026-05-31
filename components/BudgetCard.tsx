@@ -230,8 +230,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     container: {
         backgroundColor: colors.card,
         borderRadius: 24,
-        padding: 24,
-        marginBottom: 20,
+        paddingVertical: 22,
+        paddingHorizontal: 24,
+        marginBottom: 18,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
@@ -242,7 +243,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     headerTitleRow: {
         flexDirection: 'row',
@@ -271,12 +272,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     },
     mainContent: {
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     remainingAmount: {
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: '700',
-        marginBottom: 4,
+        marginBottom: 2,
         letterSpacing: -0.5,
     },
     totalRow: {
@@ -298,7 +299,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         alignItems: 'center',
     },
     progressContainer: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     progressBarBackground: {
         height: 8,
@@ -314,8 +315,8 @@ const createStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
-        paddingTop: 20,
+        marginBottom: 16,
+        paddingTop: 16,
         borderTopWidth: 1,
         borderTopColor: colors.border,
     },

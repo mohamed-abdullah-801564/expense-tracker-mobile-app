@@ -16,7 +16,8 @@ export interface FilteredExpenseResult {
     historicalPrimarySymbol?: string;
     historicalHomeSymbol?: string;
     historicalConvertedAmount?: number;
-    items?: Array<{ name: string; qty: number; total: number }>;
+    items?: Array<{ name: string; qty: number; total: number; category?: string }>;
+    groupId?: string;
 }
 
 export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult {
@@ -55,6 +56,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
         historicalHomeSymbol: expense.historicalHomeSymbol,
         historicalConvertedAmount: expense.historicalConvertedAmount,
         items: expense.items,
+        groupId: expense.groupId,
     };
 }
 

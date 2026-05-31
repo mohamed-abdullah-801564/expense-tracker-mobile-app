@@ -26,6 +26,85 @@ import { BudgetHistory } from '@/components/BudgetHistory';
 import { currencies } from '@/constants/currencies';
 import { getFallbackRate } from '@/utils/expense-parser';
 
+function groupExpensesByGroupId(expenses: FilteredExpenseResult[]): FilteredExpenseResult[] {
+    const grouped: Record<string, FilteredExpenseResult & { maxAmountCategory?: { category: any; amount: number } }> = {};
+    const result: FilteredExpenseResult[] = [];
+
+    for (const exp of expenses) {
+        const groupId = exp.groupId;
+        if (groupId === undefined || groupId === null || groupId === '') {
+            result.push(exp);
+            continue;
+        }
+
+        const existing = grouped[groupId];
+        if (existing) {
+            existing.amount += exp.amount;
+            
+            // Combine description
+            const descParts = existing.description.split(', ').map(d => d.trim());
+            const newDesc = exp.description.trim();
+            if (!descParts.includes(newDesc)) {
+                descParts.push(newDesc);
+            }
+            existing.description = descParts.join(', ');
+
+            // Update dominant category (highest amount)
+            if (existing.maxAmountCategory && exp.amount > existing.maxAmountCategory.amount) {
+                existing.maxAmountCategory = { category: exp.category, amount: exp.amount };
+                existing.category = exp.category;
+            }
+
+            // Bundle item breakdown into items array
+            if (!existing.items) {
+                existing.items = [];
+            }
+            // Add sub-item breakdown
+            existing.items.push({
+                name: exp.description,
+                qty: 1,
+                total: exp.amount,
+                category: exp.category
+            });
+
+            // Remittance accumulation
+            if (exp.isRemittance) {
+                existing.isRemittance = true;
+                existing.remittanceCode = exp.remittanceCode || existing.remittanceCode;
+                existing.historicalConvertedAmount = (existing.historicalConvertedAmount || 0) + (exp.historicalConvertedAmount || 0);
+                existing.historicalHomeSymbol = exp.historicalHomeSymbol || existing.historicalHomeSymbol;
+            }
+        } else {
+            // First item in this group
+            const items = exp.items ? [...exp.items] : [];
+            if (items.length === 0) {
+                items.push({
+                    name: exp.description,
+                    qty: 1,
+                    total: exp.amount,
+                    category: exp.category
+                });
+            }
+            const groupItem: FilteredExpenseResult & { maxAmountCategory?: { category: any; amount: number } } = {
+                ...exp,
+                items
+            };
+            groupItem.maxAmountCategory = { category: exp.category, amount: exp.amount };
+            grouped[groupId] = groupItem;
+            result.push(groupItem);
+        }
+    }
+
+    // Clean up temporary property before returning
+    for (const item of result) {
+        if (item.groupId) {
+            delete (item as any).maxAmountCategory;
+        }
+    }
+
+    return result;
+}
+
 export default function HistoryScreen() {
     const { allExpenses, isLoading, budgetHistory } = useExpenses();
     const { colors, currencyCode, homeCurrencyCode } = useTheme();
@@ -56,6 +135,10 @@ export default function HistoryScreen() {
         // Use debounced filters for expensive filtering operation
         return searchAndFilterExpenses(timeFiltered, debouncedSearchFilters);
     }, [allExpenses, selectedFilter, debouncedSearchFilters]);
+
+    const groupedFilteredExpenses = useMemo(() => {
+        return groupExpensesByGroupId(filteredExpenses);
+    }, [filteredExpenses]);
 
     const styles = createStyles(colors);
 
@@ -90,17 +173,30 @@ export default function HistoryScreen() {
                             {item.description} {item.isDeleted && '(Deleted)'}
                         </Text>
                         <Text style={styles.expenseCategory}>{item.category}</Text>
+                        
+                        {item.isRemittance && (
+                            <View style={styles.remittanceContainer}>
+                                <View style={styles.dateTimeContainer}>
+                                    <Calendar size={14} color={colors.textSecondary} />
+                                    <Text style={styles.expenseDate}>{item.date}</Text>
+                                    {item.time && (
+                                        <>
+                                            <Clock size={14} color={colors.textSecondary} />
+                                            <Text style={styles.expenseTime}>{item.time}</Text>
+                                        </>
+                                    )}
+                                </View>
+                                <Text style={styles.remittanceSubtext}>
+                                    ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
+                                </Text>
+                            </View>
+                        )}
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={styles.amountContainer}>
                             <Text style={[styles.expenseAmount, item.isDeleted && styles.deletedText]}>
                                 {colors.currencySymbol}{item.amount.toFixed(2)}
                             </Text>
-                            {item.isRemittance && (
-                                <Text style={styles.remittanceSubtext}>
-                                    ≈ {displayHomeSymbol}{displayConvertedAmount} sent home
-                                </Text>
-                            )}
                         </View>
                         {hasItems && (
                             <View style={{ paddingLeft: 4 }}>
@@ -114,16 +210,20 @@ export default function HistoryScreen() {
                     </View>
                 </View>
                 <View style={styles.expenseFooter}>
-                    <View style={styles.dateTimeContainer}>
-                        <Calendar size={14} color={colors.textSecondary} />
-                        <Text style={styles.expenseDate}>{item.date}</Text>
-                        {item.time && (
-                            <>
-                                <Clock size={14} color={colors.textSecondary} />
-                                <Text style={styles.expenseTime}>{item.time}</Text>
-                            </>
-                        )}
-                    </View>
+                    {!item.isRemittance ? (
+                        <View style={styles.dateTimeContainer}>
+                            <Calendar size={14} color={colors.textSecondary} />
+                            <Text style={styles.expenseDate}>{item.date}</Text>
+                            {item.time && (
+                                <>
+                                    <Clock size={14} color={colors.textSecondary} />
+                                    <Text style={styles.expenseTime}>{item.time}</Text>
+                                </>
+                            )}
+                        </View>
+                    ) : (
+                        <View />
+                    )}
                     <Text style={styles.expenseMonthYear}>{item.month} {item.year}</Text>
                 </View>
                 {hasItems && isExpanded && (
@@ -207,14 +307,14 @@ export default function HistoryScreen() {
 
             <View style={styles.summaryContainer}>
                 <Text style={styles.summaryText}>
-                    Showing {filteredExpenses.length} expenses
+                    Showing {groupedFilteredExpenses.length} expenses
                     {selectedFilter === 'This Month' && ' for this month'}
                 </Text>
             </View>
 
             <FlatList
-                data={filteredExpenses}
-                keyExtractor={(item, index) => `${item.date}-${item.time}-${index}`}
+                data={groupedFilteredExpenses}
+                keyExtractor={(item, index) => item.groupId ? `${item.groupId}-${index}` : `${item.date}-${item.time}-${index}`}
                 renderItem={renderExpenseItem}
                 contentContainerStyle={styles.listContent}
                 initialNumToRender={10}
@@ -465,6 +565,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     amountContainer: {
         alignItems: 'flex-end',
         justifyContent: 'center',
+    },
+    remittanceContainer: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        marginTop: 8,
+        marginBottom: 4,
+        gap: 4,
     },
     remittanceSubtext: {
         fontSize: 12,

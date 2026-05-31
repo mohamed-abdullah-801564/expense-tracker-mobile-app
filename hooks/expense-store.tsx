@@ -276,24 +276,28 @@ function useCreateExpenseContext() {
     }, [budgetHistoryQuery.data]);
 
     const addExpense = useCallback((expense: Omit<Expense, 'id' | 'createdAt'>) => {
-        const newExpense: Expense = {
-            ...expense,
-            id: Date.now().toString(),
-            createdAt: new Date().toISOString(),
-        };
-        const updated = [newExpense, ...expenses];
-        setExpenses(updated);
-        saveExpenses(updated);
+        const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        setExpenses(prev => {
+            const newExpense: Expense = {
+                ...expense,
+                id: uniqueId,
+                createdAt: new Date().toISOString(),
+            };
+            const updated = [newExpense, ...prev];
+            saveExpenses(updated);
+            return updated;
+        });
 
         // Increment and check milestones
-        const newCount = totalExpensesAdded + 1;
-        setTotalExpensesAdded(newCount);
-        StorageUtils.safeSet(EXPENSES_COUNT_KEY, newCount);
-
-        if (newCount === 5 || newCount === 10 || (newCount > 10 && newCount % 10 === 0)) {
-            setIsFeedbackModalVisible(true);
-        }
-    }, [expenses, saveExpenses, totalExpensesAdded]);
+        setTotalExpensesAdded(prev => {
+            const newCount = prev + 1;
+            StorageUtils.safeSet(EXPENSES_COUNT_KEY, newCount);
+            if (newCount === 5 || newCount === 10 || (newCount > 10 && newCount % 10 === 0)) {
+                setIsFeedbackModalVisible(true);
+            }
+            return newCount;
+        });
+    }, [saveExpenses]);
 
     const deleteExpense = useCallback((id: string) => {
         const updated = expenses.map(e =>

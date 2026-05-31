@@ -41,32 +41,41 @@ export function validateAmount(amount: number, currencySymbol: string = '₹'): 
 }
 
 export async function parseExpenseWithAI(input: string, currencySymbol: string = '₹', homeCurrencyCode: string = 'INR'): Promise<ParsedExpense> {
-    const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including shared expenses and payments to friends. When given a natural language input, your task is to:
+    const systemPrompt = `You are an AI assistant that helps users track and categorize their daily expenses, including multi-item lists, shared expenses, and payments to friends. When given a natural language input, your task is to:
         
-1. Extract the expense amount as a number.
-2. Extract the expense description or item name clearly.
-3. Categorize the expense into one of these categories: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, Drinks, Remittance, or Other.
+1. Parse the input which may contain a single expense or a multi-item list of expenses (e.g., "milk 30 sugar 40").
+2. Calculate the aggregate sum of all item amounts/prices combined. Set this as the "amount".
+3. Extract and combine all item names into a single comma-separated description string. Set this as the "description".
+4. Determine the dominant category from the items list. Choose from: Food, Transport, Utilities, Entertainment, Shopping, Health, Snacks, Drinks, Remittance, or Other.
    - For hot beverages (e.g., tea, coffee, chai, boost) and small food items, classify as 'Snacks'.
    - For cold beverages (e.g., water, juice, soda, milkshakes, cool drinks), classify as 'Drinks'.
-   - If the description refers to sending money, transferring money, or remitting money home, to family, to mom, to dad, or to parents (containing words like sent, send, transfer, remit, remittance, family, mom, dad, parent), you MUST categorize it as 'Remittance' and set 'isRemittance' to true.
-4. If the expense input contains time or part of the day (like '5 PM', 'morning'), extract it as 'time'. If not present, omit the time field.
-5. Extract details about shared expenses or payments:
+   - If the description/items refer to sending money, transferring money, or remitting money home, to family, to mom, to dad, or to parents (containing words like sent, send, transfer, remit, remittance, family, mom, dad, parent), you MUST categorize it as 'Remittance' and set 'isRemittance' to true.
+5. If the expense input contains time or part of the day (like '5 PM', 'morning'), extract it as 'time'. If not present, omit the time field.
+6. Extract details about shared expenses or payments:
    - If the user mentions splitting the expense, extract the shared amount and indicate it's split.
    - If the user mentions paying a friend, extract the amount paid and the person or label if specified.
-6. If the user describes an expense about sending money to family back home, transferring money internationally, or remitting across borders (e.g., "sent 500 dollars to family", "remitted 2000 to home account"), you must flag "isRemittance": true. You should also extract the 3-letter target currency code as "remittanceCode" if specified, or default to "${homeCurrencyCode}".
+7. If the user describes an expense about sending money to family back home, transferring money internationally, or remitting across borders (e.g., "sent 500 dollars to family", "remitted 2000 to home account"), you must flag "isRemittance": true. You should also extract the 3-letter target currency code as "remittanceCode" if specified, or default to "${homeCurrencyCode}".
+8. If the input has multiple items, also populate an "items" array where each element contains "name" (string), "qty" (number, default 1), "total" (number, price of the item), and "category" (string, the unique category classification for this specific item).
 
 Return a structured JSON response with keys:
-- amount (number)
-- description (text)
-- category (text)
+- amount (number, the total sum of all items)
+- description (text, comma-separated names of the items)
+- category (text, the dominant category)
 - time (text, optional)
 - shared_amount (number, optional)
 - paid_to (text, optional)
 - note (text, optional)
 - isRemittance (boolean, optional)
 - remittanceCode (text, optional)
+- items (array of objects with keys: name, qty, total, category; optional)
 
 Examples:
+Input: 'milk 30 sugar 40'
+Output: { "amount": 70, "description": "milk, sugar", "category": "Food", "items": [{ "name": "milk", "qty": 1, "total": 30, "category": "Food" }, { "name": "sugar", "qty": 1, "total": 40, "category": "Food" }] }
+
+Input: 'taxi 100 coffee 45'
+Output: { "amount": 145, "description": "taxi, coffee", "category": "Transport", "items": [{ "name": "taxi", "qty": 1, "total": 100, "category": "Transport" }, { "name": "coffee", "qty": 1, "total": 45, "category": "Snacks" }] }
+
 Input: 'Lunch 300 rupees split with friend 150'
 Output: { "amount": 300, "description": "Lunch", "category": "Food", "shared_amount": 150, "note": "split with friend" }
 
@@ -74,25 +83,25 @@ Input: 'Paid friend 60 for movie'
 Output: { "amount": 60, "description": "Movie payment", "category": "Entertainment", "paid_to": "friend" }
 
 Input: 'sent 500 dollars to family'
-Output: { "amount": 500, "description": "Sent money to family", "category": "Remittance", "isRemittance": true, "remittanceCode": "USD" }
-
-Input: 'remitted 2000 to home account'
-Output: { "amount": 2000, "description": "Remittance to home account", "category": "Remittance", "isRemittance": true, "remittanceCode": "${homeCurrencyCode}" }`;
+Output: { "amount": 500, "description": "Sent money to family", "category": "Remittance", "isRemittance": true, "remittanceCode": "USD" }`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout for proxy LLM routing
 
     try {
-        const response = await fetch('https://toolkit.rork.com/text/llm/', {
+        const proxyUrl = process.env.EXPO_PUBLIC_PROXY_URL;
+        if (!proxyUrl) {
+            throw new Error('EXPO_PUBLIC_PROXY_URL is not configured');
+        }
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: input }
-                ]
+                prompt: input,
+                systemInstruction: systemPrompt
             }),
             signal: controller.signal
         });
@@ -102,8 +111,7 @@ Output: { "amount": 2000, "description": "Remittance to home account", "category
         }
 
         const data = await response.json();
-
-        let cleanedCompletion = data.completion.trim();
+        let cleanedCompletion = (data.text || '').trim();
 
         if (cleanedCompletion.startsWith('```json')) {
             cleanedCompletion = cleanedCompletion.replace(/^```json\s*/, '').replace(/\s*```$/, '');
@@ -143,6 +151,7 @@ Output: { "amount": 2000, "description": "Remittance to home account", "category
             ...(parsed.note && { note: parsed.note }),
             isRemittance,
             remittanceCode: parsed.remittanceCode || homeCurrencyCode,
+            ...(parsed.items && { items: parsed.items }),
         };
     } catch (error: any) {
         if (error.name === 'AbortError') {
