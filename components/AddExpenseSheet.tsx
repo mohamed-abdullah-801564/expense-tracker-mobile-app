@@ -246,19 +246,14 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
 
                 const sharedGroupId = 'group_' + Date.now();
 
-                // Loop through items and call addExpense() independently
-                for (const item of scannedData.items) {
+                const itemsToBatch = scannedData.items.map(item => {
                     const price = parseFloat(item.price) || 0;
                     const name = item.itemName.trim() || 'Scanned Item';
                     const cat = (item.category === 'Others' ? 'Other' : item.category) || 'Other';
                     const isRemittance = cat === 'Remittance';
+                    const itemConverted = isRemittance ? parseFloat((price * rate).toFixed(2)) : undefined;
 
-                    let itemConverted: number | undefined = undefined;
-                    if (isRemittance) {
-                        itemConverted = parseFloat((price * rate).toFixed(2));
-                    }
-
-                    addExpense({
+                    return {
                         amount: price,
                         description: name,
                         category: cat as any,
@@ -269,11 +264,9 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                         historicalPrimarySymbol: isRemittance ? historicalPrimarySymbol : undefined,
                         historicalHomeSymbol: isRemittance ? historicalHomeSymbol : undefined,
                         historicalConvertedAmount: itemConverted,
-                    });
-
-                    // Asynchronous delay to prevent state override race conditions
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
+                    };
+                });
+                addExpense(itemsToBatch);
 
                 setScannedData(null);
                 setInput('');
@@ -374,34 +367,28 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
 
                 const sharedGroupId = 'group_' + Date.now();
 
-                // Loop through parsed items and call addExpense() independently
-                for (const subItem of parsed.items) {
+                const itemsToBatch = parsed.items.map(subItem => {
                     const price = subItem.total || 0;
                     const name = subItem.name.trim() || 'Item';
                     const cat = subItem.category || 'Other';
                     const isRemittance = cat === 'Remittance';
+                    const itemConverted = isRemittance ? parseFloat((price * rate).toFixed(2)) : undefined;
 
-                    let itemConverted: number | undefined = undefined;
-                    if (isRemittance) {
-                        itemConverted = parseFloat((price * rate).toFixed(2));
-                    }
-
-                    addExpense({
+                    return {
                         amount: price,
                         description: name,
                         category: cat as any,
                         groupId: sharedGroupId,
                         date: expenseDate,
+                        items: parsed.items,
                         isRemittance,
                         remittanceCode: isRemittance ? homeCurrencyCode : undefined,
                         historicalPrimarySymbol: isRemittance ? historicalPrimarySymbol : undefined,
                         historicalHomeSymbol: isRemittance ? historicalHomeSymbol : undefined,
                         historicalConvertedAmount: itemConverted,
-                    });
-
-                    // Asynchronous 50ms delay to prevent state override race conditions
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
+                    };
+                });
+                addExpense(itemsToBatch);
             } else {
                 // Existing single expense path
                 let splitData: ParsedSplitWithNames | null = null;

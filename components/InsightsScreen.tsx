@@ -16,6 +16,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/categories';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, isWithinInterval, startOfYear, endOfYear, addYears, subYears } from 'date-fns';
+import { safeParseDate } from '@/utils/search-filter';
 
 const { width } = Dimensions.get('window');
 const CHART_SIZE = width * 0.55;
@@ -66,7 +67,8 @@ export default function InsightsScreen() {
 
         return allExpenses.filter(expense => {
             if (expense.isDeleted) return false;
-            const expenseDate = new Date(expense.date);
+            const expenseDate = safeParseDate(expense.date);
+            if (!expenseDate || isNaN(expenseDate.getTime())) return false;
             return isWithinInterval(expenseDate, { start, end });
         });
     }, [allExpenses, currentDate, viewMode]);

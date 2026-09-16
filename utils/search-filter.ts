@@ -10,7 +10,8 @@ export interface SearchFilters {
     amountMax?: number;
 }
 
-function parseUserDateString(dateStr: string): string | null {
+export function parseUserDateString(dateStr: string): string | null {
+    if (!dateStr) return null;
     const trimmed = dateStr.trim();
 
     // DD/MM/YYYY format
@@ -38,6 +39,16 @@ function parseUserDateString(dateStr: string): string | null {
     return null;
 }
 
+export function safeParseDate(dateStr: string | undefined | null): Date | null {
+    if (!dateStr) return null;
+    const normalizedStr = parseUserDateString(dateStr) || dateStr;
+    const date = new Date(normalizedStr);
+    if (isNaN(date.getTime())) {
+        return null;
+    }
+    return date;
+}
+
 function isSameDay(date1: Date, date2: Date): boolean {
     return (
         date1.getFullYear() === date2.getFullYear() &&
@@ -61,20 +72,21 @@ export function searchAndFilterExpenses(
             let matchesDate = expense.date.includes(filters.searchText);
             if (!matchesDate) {
                 try {
-                    const parsedExpenseDateStr = parseUserDateString(expense.date) || expense.date;
-                    const expenseDate = new Date(parsedExpenseDateStr);
-                    const searchDateFormats = [
-                        filters.searchText,
-                        parseUserDateString(filters.searchText)
-                    ];
+                    const expenseDate = safeParseDate(expense.date);
+                    if (expenseDate && !isNaN(expenseDate.getTime())) {
+                        const searchDateFormats = [
+                            filters.searchText,
+                            parseUserDateString(filters.searchText)
+                        ];
 
-                    for (const dateStr of searchDateFormats) {
-                        if (dateStr) {
-                            const searchDate = new Date(parseUserDateString(dateStr) || dateStr);
-                            if (!isNaN(searchDate.getTime()) && !isNaN(expenseDate.getTime())) {
-                                if (isSameDay(expenseDate, searchDate)) {
-                                    matchesDate = true;
-                                    break;
+                        for (const dateStr of searchDateFormats) {
+                            if (dateStr) {
+                                const searchDate = safeParseDate(dateStr);
+                                if (searchDate && !isNaN(searchDate.getTime())) {
+                                    if (isSameDay(expenseDate, searchDate)) {
+                                        matchesDate = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -96,21 +108,21 @@ export function searchAndFilterExpenses(
 
         // Date range filter
         if (filters.dateFrom || filters.dateTo) {
-            const parsedExpenseDateStr = parseUserDateString(expense.date) || expense.date;
-            const expenseDate = new Date(parsedExpenseDateStr);
+            const expenseDate = safeParseDate(expense.date);
+            if (!expenseDate || isNaN(expenseDate.getTime())) {
+                return false;
+            }
 
             if (filters.dateFrom) {
-                const parsedFromDateStr = parseUserDateString(filters.dateFrom) || filters.dateFrom;
-                const fromDate = new Date(parsedFromDateStr);
-                if (!isNaN(expenseDate.getTime()) && !isNaN(fromDate.getTime())) {
+                const fromDate = safeParseDate(filters.dateFrom);
+                if (fromDate && !isNaN(fromDate.getTime())) {
                     if (expenseDate < fromDate) return false;
                 }
             }
 
             if (filters.dateTo) {
-                const parsedToDateStr = parseUserDateString(filters.dateTo) || filters.dateTo;
-                const toDate = new Date(parsedToDateStr);
-                if (!isNaN(expenseDate.getTime()) && !isNaN(toDate.getTime())) {
+                const toDate = safeParseDate(filters.dateTo);
+                if (toDate && !isNaN(toDate.getTime())) {
                     if (expenseDate > toDate) return false;
                 }
             }

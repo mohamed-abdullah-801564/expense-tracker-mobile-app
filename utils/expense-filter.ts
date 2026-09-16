@@ -1,4 +1,5 @@
 import { Expense } from '@/types/expense';
+import { safeParseDate } from '@/utils/search-filter';
 
 export type FilterType = 'This Month' | 'Total Expenses';
 
@@ -21,7 +22,8 @@ export interface FilteredExpenseResult {
 }
 
 export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult {
-    const expenseDate = new Date(expense.date);
+    const parsedDate = safeParseDate(expense.date);
+    const expenseDate = (parsedDate && !isNaN(parsedDate.getTime())) ? parsedDate : new Date();
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
@@ -33,7 +35,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
     // Format time - use provided time or extract from createdAt
     let formattedTime = expense.time || '';
     if (!formattedTime && expense.createdAt) {
-        const createdDate = new Date(expense.createdAt);
+        const createdDate = safeParseDate(expense.createdAt) || new Date();
         const hours = createdDate.getHours();
         const minutes = createdDate.getMinutes();
         const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -48,7 +50,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
         category: expense.category,
         date: formattedDate,
         time: formattedTime,
-        month: monthNames[expenseDate.getMonth()],
+        month: monthNames[expenseDate.getMonth()] || 'January',
         year: expenseDate.getFullYear().toString(),
         isRemittance: expense.isRemittance,
         remittanceCode: expense.remittanceCode,
@@ -69,15 +71,21 @@ export function filterExpensesByType(expenses: Expense[], filterType: FilterType
 
     if (filterType === 'This Month') {
         filteredExpenses = expenses.filter(expense => {
-            const expenseDate = new Date(expense.date);
+            if (expense.isDeleted) return false;
+            const expenseDate = safeParseDate(expense.date);
+            if (!expenseDate || isNaN(expenseDate.getTime())) return false;
             return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
         });
     } else if (filterType === 'Total Expenses') {
-        filteredExpenses = expenses;
+        filteredExpenses = expenses.filter(expense => !expense.isDeleted);
     }
 
     // Sort by date (newest first)
-    filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filteredExpenses.sort((a, b) => {
+        const dateA = safeParseDate(a.date)?.getTime() || 0;
+        const dateB = safeParseDate(b.date)?.getTime() || 0;
+        return dateB - dateA;
+    });
 
     return filteredExpenses.map(formatExpenseForDisplay);
 }

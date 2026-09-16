@@ -1,11 +1,9 @@
 import { ParsedBudget } from '@/types/expense';
 import { validateAmount } from './expense-parser';
 
-const LLM_API_URL = 'https://toolkit.rork.com/text/llm/';
-
 export async function parseBudgetWithAI(input: string, currencySymbol: string = '₹'): Promise<ParsedBudget> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
     try {
         const systemPrompt = `You are an AI assistant that helps users set or update their budget for expense tracking. When given a natural language input, your task is to extract:
@@ -32,21 +30,22 @@ Output: { "budget_amount": 5000, "budget_days": null, "is_add_operation": false 
 Input: 'Increase budget by 500'
 Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`;
 
-        const response = await fetch(LLM_API_URL, {
+        const proxyUrl = process.env.EXPO_PUBLIC_PROXY_URL;
+        if (!proxyUrl) {
+            throw new Error('EXPO_PUBLIC_PROXY_URL is not configured');
+        }
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: input }
-                ]
+                prompt: input,
+                systemInstruction: systemPrompt
             }),
             signal: controller.signal
         });
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error('Failed to parse budget');
@@ -55,7 +54,7 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
         const data = await response.json();
 
         // Clean the response to handle markdown code blocks and other formatting
-        let cleanedCompletion = data.completion.trim();
+        let cleanedCompletion = (data.text || '').trim();
 
         // Remove markdown code blocks if present
         if (cleanedCompletion.startsWith('```json')) {
@@ -86,7 +85,6 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
             is_add_operation: parsed.is_add_operation
         };
     } catch (error: any) {
-        clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
             console.log('Budget parsing timed out, falling back to basic parser');
         } else {
@@ -94,6 +92,8 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
         }
         // Fallback to basic parsing
         return fallbackBudgetParser(input, currencySymbol);
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, TextInput } fro
 import { Target, AlertTriangle, CheckCircle, Clock, Plus, X } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
+import { useExchangeRate } from '@/hooks/use-exchange-rate';
 
 interface BudgetCardProps {
     onSetBudget: () => void;
@@ -10,7 +11,8 @@ interface BudgetCardProps {
 
 export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
     const { budgetProgress, clearBudget, setBudgetData } = useExpenses();
-    const { colors } = useTheme();
+    const { colors, currencyCode } = useTheme();
+    const exchangeRate = useExchangeRate('INR', currencyCode);
     const [showTopUp, setShowTopUp] = useState(false);
     const [topUpAmount, setTopUpAmount] = useState('');
     const styles = createStyles(colors);
@@ -21,9 +23,10 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             return;
         }
 
-        const amount = parseFloat(topUpAmount);
+        const inputAmount = parseFloat(topUpAmount);
+        const baseAmount = exchangeRate > 0 ? inputAmount / exchangeRate : inputAmount;
         const days = budgetProgress?.budget?.days ?? 0;
-        setBudgetData(amount, days, 'add');
+        setBudgetData(baseAmount, days, 'add');
 
         setShowTopUp(false);
         setTopUpAmount('');
@@ -76,6 +79,10 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
         ? Math.max(0, budgetProgress.remaining) / budgetProgress.daysRemaining
         : 0;
 
+    const convertedRemaining = budgetProgress.remaining * exchangeRate;
+    const convertedTotalAmount = budgetProgress.budget.amount * exchangeRate;
+    const convertedDailyLimit = dailyLimit * exchangeRate;
+
     const handleClearBudget = () => {
         Alert.alert(
             "Clear Budget",
@@ -113,12 +120,12 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             {/* Main Content */}
             <View style={styles.mainContent}>
                 <Text style={[styles.remainingAmount, { color: colors.text }]}>
-                    {colors.currencySymbol}{budgetProgress.remaining.toLocaleString()}
+                    {colors.currencySymbol}{convertedRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
 
                 <View style={styles.totalRow}>
                     <Text style={styles.totalText}>
-                        of {colors.currencySymbol}{budgetProgress.budget.amount.toLocaleString()} total
+                        of {colors.currencySymbol}{convertedTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
                     </Text>
                     <TouchableOpacity onPress={() => setShowTopUp(true)} style={styles.topUpButton}>
                         <Plus size={14} color="white" />
@@ -145,7 +152,7 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             <View style={styles.footer}>
                 <View style={styles.footerItem}>
                     <Text style={[styles.footerHighlight, { color: colors.primary }]}>
-                        {colors.currencySymbol}{dailyLimit.toFixed(0)}
+                        {colors.currencySymbol}{convertedDailyLimit.toFixed(0)}
                         <Text style={styles.footerLabel}>/day limit</Text>
                     </Text>
                 </View>

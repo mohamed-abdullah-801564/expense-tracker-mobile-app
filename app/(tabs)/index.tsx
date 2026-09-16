@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { useFirstTime } from '@/hooks/first-time-store';
+import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { ExpenseCard } from '@/components/ExpenseCard';
 import CategoryFilter from '@/components/CategoryFilter';
 import { AddExpenseSheet } from '@/components/AddExpenseSheet';
@@ -13,7 +14,9 @@ import HowItWorksScreen from '@/components/HowItWorksScreen';
 
 export default function ExpensesScreen() {
   const { expenses, stats, isLoading } = useExpenses();
-  const { colors } = useTheme();
+  const { colors, currencyCode } = useTheme();
+  const exchangeRate = useExchangeRate('INR', currencyCode);
+  const convertedTotal = stats.total * exchangeRate;
   const { isFirstTime, markGuideAsSeen, isLoading: isLoadingFirstTime } = useFirstTime();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showBudgetSheet, setShowBudgetSheet] = useState(false);
@@ -49,7 +52,7 @@ export default function ExpensesScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.totalLabel}>Total Expenses</Text>
-          <Text style={styles.totalAmount}>{colors.currencySymbol}{stats.total.toFixed(2)}</Text>
+          <Text style={styles.totalAmount}>{colors.currencySymbol}{convertedTotal.toFixed(2)}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity

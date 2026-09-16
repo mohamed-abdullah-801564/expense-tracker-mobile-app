@@ -156,11 +156,11 @@ export default function HistoryScreen() {
             displayConvertedAmount = (item.amount * rate).toFixed(2);
         }
 
-        const hasItems = !!(item.items && item.items.length > 0);
+        const hasMultipleItems = !!(item.items && item.items.length > 1);
         const isExpanded = !!(item.id && expandedItems[item.id]);
 
-        const CardComponent = hasItems ? TouchableOpacity : View;
-        const cardProps = hasItems ? {
+        const CardComponent = hasMultipleItems ? TouchableOpacity : View;
+        const cardProps = hasMultipleItems ? {
             activeOpacity: 0.7,
             onPress: () => item.id && toggleItemExpanded(item.id),
         } : {};
@@ -198,7 +198,7 @@ export default function HistoryScreen() {
                                 {colors.currencySymbol}{item.amount.toFixed(2)}
                             </Text>
                         </View>
-                        {hasItems && (
+                        {hasMultipleItems && (
                             <View style={{ paddingLeft: 4 }}>
                                 {isExpanded ? (
                                     <ChevronUp size={18} color={colors.textSecondary} />
@@ -226,7 +226,7 @@ export default function HistoryScreen() {
                     )}
                     <Text style={styles.expenseMonthYear}>{item.month} {item.year}</Text>
                 </View>
-                {hasItems && isExpanded && (
+                {hasMultipleItems && isExpanded && (
                     <View style={styles.subTableContainer}>
                         <View style={styles.subTableHeader}>
                             <Text style={[styles.subTableHeaderText, { flex: 2, color: colors.textSecondary }]}>Item</Text>
@@ -235,9 +235,16 @@ export default function HistoryScreen() {
                         </View>
                         {item.items?.map((subItem, idx) => (
                             <View key={idx} style={styles.subTableRow}>
-                                <Text style={[styles.subTableRowText, { flex: 2, color: colors.text }]} numberOfLines={1}>
-                                    {subItem.name}
-                                </Text>
+                                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={[styles.subTableRowText, { color: colors.text }]} numberOfLines={1}>
+                                        {subItem.name}
+                                    </Text>
+                                    {subItem.category && (
+                                        <Text style={[styles.subTableRowText, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
+                                            ({subItem.category})
+                                        </Text>
+                                    )}
+                                </View>
                                 <Text style={[styles.subTableRowText, { flex: 0.5, textAlign: 'center', color: colors.textSecondary }]}>
                                     {subItem.qty}
                                 </Text>
@@ -314,7 +321,7 @@ export default function HistoryScreen() {
 
             <FlatList
                 data={groupedFilteredExpenses}
-                keyExtractor={(item, index) => item.groupId ? `${item.groupId}-${index}` : `${item.date}-${item.time}-${index}`}
+                keyExtractor={(item, index) => item.id || (item.groupId ? `group-${item.groupId}-${index}` : `expense-${item.date}-${item.time}-${index}`)}
                 renderItem={renderExpenseItem}
                 contentContainerStyle={styles.listContent}
                 initialNumToRender={10}

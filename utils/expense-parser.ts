@@ -107,7 +107,9 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
         });
 
         if (!response.ok) {
-            throw new Error('Failed to parse expense');
+            const errorText = await response.text().catch(() => '');
+            console.error(`Proxy response failed with status ${response.status}:`, errorText);
+            throw new Error(`Failed to parse expense: ${response.status} ${errorText}`);
         }
 
         const data = await response.json();
@@ -165,18 +167,103 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
     }
 }
 
+function getItemCategory(name: string): ParsedExpense['category'] {
+    const lower = name.toLowerCase();
+    const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"];
+    if (remittanceKeywords.some(kw => lower.includes(kw))) return 'Remittance';
+
+    if (lower.includes('tea') || lower.includes('coffee') || lower.includes('chai') || lower.includes('boost') || lower.includes('bun') || lower.includes('samosa') || lower.includes('biscuit') || lower.includes('snack')) {
+        return 'Snacks';
+    }
+    if (lower.includes('water') || lower.includes('juice') || lower.includes('soda') || lower.includes('milkshake') || lower.includes('drink') || lower.includes('cool')) {
+        return 'Drinks';
+    }
+    if (lower.includes('food') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('breakfast') || lower.includes('rice') || lower.includes('biryani') || lower.includes('burger') || lower.includes('pizza') || lower.includes('meal') || lower.includes('milk') || lower.includes('sugar')) {
+        return 'Food';
+    }
+    if (lower.includes('bus') || lower.includes('taxi') || lower.includes('uber') || lower.includes('auto') || lower.includes('transport') || lower.includes('fuel') || lower.includes('petrol') || lower.includes('cab')) {
+        return 'Transport';
+    }
+    if (lower.includes('electricity') || lower.includes('gas') || lower.includes('internet') || lower.includes('rent') || lower.includes('bill')) {
+        return 'Utilities';
+    }
+    if (lower.includes('movie') || lower.includes('game') || lower.includes('cinema') || lower.includes('entertainment')) {
+        return 'Entertainment';
+    }
+    if (lower.includes('shopping') || lower.includes('clothes') || lower.includes('shoes') || lower.includes('shirt')) {
+        return 'Shopping';
+    }
+    if (lower.includes('doctor') || lower.includes('medicine') || lower.includes('hospital') || lower.includes('pharmacy')) {
+        return 'Health';
+    }
+    return 'Other';
+}
+
 function fallbackParser(input: string, currencySymbol: string = '₹', homeCurrencyCode: string = 'INR'): ParsedExpense {
     const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Extract amount using dynamic regex, making the currency symbol optional
+    const lowerInput = input.toLowerCase();
+
+    // Multi-item regex parsing: matching item name followed by amount e.g., "coffee 50 lunch 100"
+    const pairRegex = new RegExp(`([a-zA-Z\\s&'-]+?)\\s+(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`, 'g');
+    const matches: Array<{ name: string; amount: number }> = [];
+    let match;
+
+    while ((match = pairRegex.exec(input)) !== null) {
+        let name = match[1].trim();
+        const amount = parseFloat(match[2]);
+        if (amount > 0 && name.length > 0) {
+            name = name.replace(/^(bought|paid for|had|got|i bought|i had|i paid|spent on)\s+/i, '').trim();
+            if (name.length > 0) {
+                matches.push({ name, amount });
+            }
+        }
+    }
+
+    if (matches.length > 1) {
+        const items: Array<{ name: string; qty: number; total: number; category?: ParsedExpense['category'] }> = [];
+        const categoryTotals: Record<string, number> = {};
+        let totalSum = 0;
+
+        for (const item of matches) {
+            const cat = getItemCategory(item.name);
+            items.push({
+                name: item.name,
+                qty: 1,
+                total: item.amount,
+                category: cat
+            });
+            totalSum += item.amount;
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + item.amount;
+        }
+
+        // Determine dominant category (highest total amount)
+        let dominantCategory: ParsedExpense['category'] = items[0].category || 'Other';
+        let maxTotal = 0;
+        Object.entries(categoryTotals).forEach(([cat, catTotal]) => {
+            if (catTotal > maxTotal) {
+                maxTotal = catTotal;
+                dominantCategory = cat as ParsedExpense['category'];
+            }
+        });
+
+        const description = items.map(i => i.name).join(', ');
+
+        return {
+            amount: totalSum,
+            description,
+            category: dominantCategory,
+            items,
+        };
+    }
+
+    // Single item fallback extraction
     const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
     const amountMatch = input.match(amountRegex);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
 
-    // Extract time using regex
     const timeMatch = input.match(/(\d{1,2}\s*(?:AM|PM|am|pm)|\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?|morning|afternoon|evening|night)/i);
     const time = timeMatch ? timeMatch[1] : undefined;
 
-    // Remove amount and time from description
     const cleanupRegex = new RegExp(`(?:${escapedSymbol})?\\d+(?:\\.\\d+)?`, 'g');
     let description = input.replace(cleanupRegex, '').trim();
     if (time) {
@@ -184,34 +271,9 @@ function fallbackParser(input: string, currencySymbol: string = '₹', homeCurre
     }
     description = description.replace(/\s+at\s*$/i, '').trim() || 'Expense';
 
-    // Basic keyword-based categorization
-    const lowerInput = input.toLowerCase();
-    
-    // Explicit variations to match: "sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"
     const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"];
     const isRemittance = remittanceKeywords.some(keyword => lowerInput.includes(keyword));
-
-    let category: ParsedExpense['category'] = 'Other';
-
-    if (isRemittance) {
-        category = 'Remittance';
-    } else if (lowerInput.includes('food') || lowerInput.includes('lunch') || lowerInput.includes('dinner') || lowerInput.includes('breakfast')) {
-        category = 'Food';
-    } else if (lowerInput.includes('bus') || lowerInput.includes('taxi') || lowerInput.includes('uber') || lowerInput.includes('transport') || lowerInput.includes('fuel')) {
-        category = 'Transport';
-    } else if (lowerInput.includes('electricity') || lowerInput.includes('gas') || lowerInput.includes('internet') || lowerInput.includes('rent')) {
-        category = 'Utilities';
-    } else if (lowerInput.includes('movie') || lowerInput.includes('game') || lowerInput.includes('entertainment')) {
-        category = 'Entertainment';
-    } else if (lowerInput.includes('shopping') || lowerInput.includes('clothes') || lowerInput.includes('shoes')) {
-        category = 'Shopping';
-    } else if (lowerInput.includes('doctor') || lowerInput.includes('medicine') || lowerInput.includes('hospital')) {
-        category = 'Health';
-    } else if (lowerInput.includes('tea') || lowerInput.includes('coffee') || lowerInput.includes('chai') || lowerInput.includes('boost') || lowerInput.includes('bun') || lowerInput.includes('samosa') || lowerInput.includes('biscuits')) {
-        category = 'Snacks';
-    } else if (lowerInput.includes('water') || lowerInput.includes('juice') || lowerInput.includes('soda') || lowerInput.includes('milkshake') || lowerInput.includes('drink') || lowerInput.includes('cool')) {
-        category = 'Drinks';
-    }
+    const category = getItemCategory(description);
 
     let remittanceCode = homeCurrencyCode;
     const words = lowerInput.toUpperCase().split(/\s+/);

@@ -5,6 +5,7 @@ import { parseBudgetWithAI } from '@/utils/budget-parser';
 import { validateAmount } from '@/utils/expense-parser';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
+import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { DeductionChoiceModal } from '@/components/DeductionChoiceModal';
 
 interface SetBudgetSheetProps {
@@ -18,7 +19,8 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
     const [showDeductionChoice, setShowDeductionChoice] = useState<boolean>(false);
     const [pendingBudget, setPendingBudget] = useState<{ amount: number; days: number } | null>(null);
     const { setBudgetData, budgetProgress, stats, allExpenses } = useExpenses();
-    const { colors } = useTheme();
+    const { colors, currencyCode } = useTheme();
+    const exchangeRate = useExchangeRate('INR', currencyCode);
 
     const handleSetBudget = async () => {
         if (!input.trim()) {
@@ -51,22 +53,22 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                 return;
             }
 
-            // If it is an add operation, default days to current budget days if null (logic handled in store usually, but parser returns null here)
-            // Actually store expects a number, so lets pass current days if null
+            // Convert amount from user's active primary currency into base currency for storage
+            const baseAmount = exchangeRate > 0 ? parsed.budget_amount / exchangeRate : parsed.budget_amount;
             const daysToPass = parsed.budget_days ?? (budgetProgress?.budget.days || 7);
 
-            setPendingBudget({ amount: parsed.budget_amount, days: daysToPass });
+            setPendingBudget({ amount: baseAmount, days: daysToPass });
 
             if (isAddOperation) {
                 // If adding to existing budget, skip deduction choice and just add
-                setBudgetData(parsed.budget_amount, daysToPass, 'add', false);
+                setBudgetData(baseAmount, daysToPass, 'add', false);
                 setInput('');
                 onClose();
                 Alert.alert('Success', `Budget updated: Added ${colors.currencySymbol}${parsed.budget_amount} to current pool.`);
             } else if (allExpenses.length > 0) {
                 setShowDeductionChoice(true);
             } else {
-                setBudgetData(parsed.budget_amount, daysToPass, 'replace', false);
+                setBudgetData(baseAmount, daysToPass, 'replace', false);
                 setInput('');
                 onClose();
                 Alert.alert('Success', `Budget set successfully!`);
@@ -133,7 +135,9 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                         {budgetProgress && (
                             <View style={[styles.currentBudget, { backgroundColor: colors.background }]}>
                                 <Text style={[styles.currentBudgetTitle, { color: colors.textSecondary }]}>Current Budget</Text>
-                                <Text style={[styles.currentBudgetAmount, { color: colors.text }]}>{colors.currencySymbol}{budgetProgress.budget.amount}</Text>
+                                <Text style={[styles.currentBudgetAmount, { color: colors.text }]}>
+                                    {colors.currencySymbol}{(budgetProgress.budget.amount * exchangeRate).toFixed(2)}
+                                </Text>
                                 <Text style={[styles.currentBudgetDays, { color: colors.textSecondary }]}>
                                     {budgetProgress.daysRemaining} days remaining
                                 </Text>
@@ -149,7 +153,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                                     />
                                 </View>
                                 <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-                                    {colors.currencySymbol}{budgetProgress.totalSpent} / {colors.currencySymbol}{budgetProgress.budget.amount} spent
+                                    {colors.currencySymbol}{(budgetProgress.totalSpent * exchangeRate).toFixed(2)} / {colors.currencySymbol}{(budgetProgress.budget.amount * exchangeRate).toFixed(2)} spent
                                 </Text>
                             </View>
                         )}

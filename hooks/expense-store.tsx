@@ -92,7 +92,8 @@ const StorageUtils = {
 
     async exportData() {
         try {
-            const expenses = await this.safeGet(STORAGE_KEY, []);
+            const rawExpenses = await this.safeGet(STORAGE_KEY, []);
+            const expenses = rawExpenses.filter((e: any) => !e.isDeleted);
             const budget = await this.safeGet(BUDGET_STORAGE_KEY, null);
             const budgetHistory = await this.safeGet(BUDGET_HISTORY_STORAGE_KEY, []);
 
@@ -275,24 +276,37 @@ function useCreateExpenseContext() {
         }
     }, [budgetHistoryQuery.data]);
 
-    const addExpense = useCallback((expense: Omit<Expense, 'id' | 'createdAt'>) => {
-        const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const addExpense = useCallback((expenseOrExpenses: Omit<Expense, 'id' | 'createdAt'> | Omit<Expense, 'id' | 'createdAt'>[]) => {
+        const itemsToAdd = Array.isArray(expenseOrExpenses) ? expenseOrExpenses : [expenseOrExpenses];
+        
         setExpenses(prev => {
-            const newExpense: Expense = {
-                ...expense,
-                id: uniqueId,
-                createdAt: new Date().toISOString(),
-            };
-            const updated = [newExpense, ...prev];
+            const now = Date.now();
+            const isoNow = new Date().toISOString();
+            const newExpenses: Expense[] = itemsToAdd.map((item, index) => {
+                let validDate = item.date;
+                if (!validDate) {
+                    validDate = isoNow;
+                } else {
+                    const parsed = new Date(validDate);
+                    validDate = isNaN(parsed.getTime()) ? isoNow : parsed.toISOString();
+                }
+
+                return {
+                    ...item,
+                    id: `${now}-${Math.floor(Math.random() * 100000000)}-${index}`,
+                    date: validDate,
+                    createdAt: (item as any).createdAt || isoNow,
+                };
+            });
+            const updated = [...newExpenses, ...prev];
             saveExpenses(updated);
             return updated;
         });
 
-        // Increment and check milestones
         setTotalExpensesAdded(prev => {
-            const newCount = prev + 1;
+            const newCount = prev + itemsToAdd.length;
             StorageUtils.safeSet(EXPENSES_COUNT_KEY, newCount);
-            if (newCount === 5 || newCount === 10 || (newCount > 10 && newCount % 10 === 0)) {
+            if (newCount >= 5 && (newCount % 5 === 0 || newCount === 6)) {
                 setIsFeedbackModalVisible(true);
             }
             return newCount;
@@ -461,15 +475,22 @@ function useCreateExpenseContext() {
         };
     }, [budget, expenses]);
 
+    // Filter active expenses (non-deleted)
+    const activeExpenses = useMemo(() => {
+        return expenses.filter(e => !e.isDeleted);
+    }, [expenses]);
+
     // Filter expenses by category
     const filteredExpenses = useMemo(() => {
-        if (!selectedCategory) return expenses.filter(e => !e.isDeleted);
-        return expenses.filter(e => e.category === selectedCategory && !e.isDeleted);
-    }, [expenses, selectedCategory]);
+        if (!selectedCategory) return activeExpenses;
+        return activeExpenses.filter(e => e.category === selectedCategory);
+    }, [activeExpenses, selectedCategory]);
 
     return {
         expenses: filteredExpenses,
-        allExpenses: expenses,
+        allExpenses: activeExpenses,
+        activeExpenses,
+        rawExpenses: expenses,
         stats,
         selectedCategory,
         setSelectedCategory,
@@ -502,7 +523,9 @@ export function useExpensesByDateRange(startDate: Date, endDate: Date) {
 
     return useMemo(() => {
         return allExpenses.filter(expense => {
+            if (expense.isDeleted) return false;
             const expenseDate = new Date(expense.date);
+            if (isNaN(expenseDate.getTime())) return false;
             return expenseDate >= startDate && expenseDate <= endDate;
         });
     }, [allExpenses, startDate, endDate]);
