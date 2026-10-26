@@ -15,8 +15,7 @@ import HowItWorksScreen from '@/components/HowItWorksScreen';
 export default function ExpensesScreen() {
   const { expenses, stats, isLoading } = useExpenses();
   const { colors, currencyCode } = useTheme();
-  const exchangeRate = useExchangeRate('INR', currencyCode);
-  const convertedTotal = stats.total * exchangeRate;
+  const convertedTotal = stats.total;
   const { isFirstTime, markGuideAsSeen, isLoading: isLoadingFirstTime } = useFirstTime();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showBudgetSheet, setShowBudgetSheet] = useState(false);

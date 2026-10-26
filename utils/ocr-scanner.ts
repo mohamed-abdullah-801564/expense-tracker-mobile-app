@@ -119,7 +119,21 @@ Format:
     }
     cleaned = cleaned.trim();
 
-    const parsed = JSON.parse(cleaned);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(cleaned);
+    } catch {
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                parsed = JSON.parse(jsonMatch[0]);
+            } catch {
+                throw new Error('Could not parse receipt data. Please check receipt clarity or enter details manually.');
+            }
+        } else {
+            throw new Error('Could not parse receipt data. Please check receipt clarity or enter details manually.');
+        }
+    }
     
     if (parsed.error === 'invalid_document') {
         return { error: 'invalid_document' };

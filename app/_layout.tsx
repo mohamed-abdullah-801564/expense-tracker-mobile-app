@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
@@ -34,7 +34,7 @@ function GlobalModals() {
 
 function GlobalStatusBar() {
   const { isDarkMode } = useTheme();
-  return <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent={true} />;
+  return <StatusBar style={isDarkMode ? 'light' : 'dark'} />;
 }
 
 function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart: () => void }) {
@@ -70,7 +70,7 @@ function LaunchScreen({ isDataReady, onStart }: { isDataReady: boolean, onStart:
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent={true} />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ScrollView 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 20 }}

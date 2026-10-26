@@ -20,7 +20,7 @@ interface SearchBarProps {
 }
 
 const categories: (ExpenseCategory | 'All')[] = [
-    'All', 'Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'
+    'All', 'Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Snacks', 'Drinks', 'Remittance', 'Other'
 ];
 
 export default function SearchBar({ filters, onFiltersChange, placeholder = 'Search expenses...' }: SearchBarProps) {

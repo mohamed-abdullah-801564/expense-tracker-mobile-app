@@ -6,12 +6,12 @@ import {
     TouchableOpacity,
     Switch,
     ScrollView,
-    SafeAreaView,
     Modal,
     TextInput,
     Alert,
     Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {
@@ -26,14 +26,23 @@ import {
     Database,
     Shield,
     HelpCircle,
-    Star
+    Star,
+    FileText,
+    Landmark,
+    Sliders,
+    Smartphone,
+    Zap
 } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { useTheme } from '@/hooks/theme-store';
 import { useNotifications } from '@/hooks/notification-store';
 import { useExpenses } from '@/hooks/expense-store';
+import { useAutoTracking } from '@/hooks/use-auto-tracking';
 import { ExpenseCategory } from '@/types/expense';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
 import CurrencyPicker from './CurrencyPicker';
+import { parseBankStatementCsv, ParsedBankTransaction } from '@/utils/bank-statement-parser';
+import CsvImportModal from '@/components/CsvImportModal';
 
 const categories: ExpenseCategory[] = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'];
 
@@ -61,13 +70,24 @@ export default function SettingsScreen() {
         budgetHistory,
         exportAllData,
         createBackup,
-        setFeedbackModalVisible
+        setFeedbackModalVisible,
+        addExpense,
+        dashboardMode,
+        setDashboardMode
     } = useExpenses();
+    const {
+        isAutoTrackingEnabled,
+        setAutoTrackingEnabled,
+        processNotification
+    } = useAutoTracking();
 
     const [showAddBill, setShowAddBill] = useState<boolean>(false);
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [isCreatingBackup, setIsCreatingBackup] = useState<boolean>(false);
     const [showHowItWorks, setShowHowItWorks] = useState<boolean>(false);
+    const [csvTransactions, setCsvTransactions] = useState<ParsedBankTransaction[]>([]);
+    const [showCsvModal, setShowCsvModal] = useState<boolean>(false);
+    const [isImportingCsv, setIsImportingCsv] = useState<boolean>(false);
     const [billForm, setBillForm] = useState({
         name: '',
         amount: '',
@@ -75,6 +95,97 @@ export default function SettingsScreen() {
         dueDate: '',
         frequency: 'monthly' as 'monthly' | 'weekly' | 'yearly',
     });
+
+    const handleImportCsv = async () => {
+        setIsImportingCsv(true);
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/csv', '*/*'],
+                copyToCacheDirectory: true,
+            });
+
+            if (result.canceled || !result.assets || result.assets.length === 0) {
+                setIsImportingCsv(false);
+                return;
+            }
+
+            const fileUri = result.assets[0].uri;
+            const csvContent = await FileSystem.readAsStringAsync(fileUri);
+
+            const parsed = parseBankStatementCsv(csvContent);
+            if (parsed.length === 0) {
+                Alert.alert(
+                    'No Debit Expenses Found',
+                    'Could not find any debit transaction rows in the selected CSV file. Please make sure you uploaded a valid Indian bank statement.'
+                );
+                setIsImportingCsv(false);
+                return;
+            }
+
+            setCsvTransactions(parsed);
+            setShowCsvModal(true);
+        } catch (error: any) {
+            console.error('Error importing CSV bank statement:', error);
+            Alert.alert('Import Failed', 'An error occurred while reading the CSV file.');
+        } finally {
+            setIsImportingCsv(false);
+        }
+    };
+
+    const handleConfirmCsvImport = (selectedItems: ParsedBankTransaction[]) => {
+        if (selectedItems.length === 0) return;
+
+        const isDuplicate = (item: ParsedBankTransaction) => {
+            return allExpenses.some(
+                e => !e.isDeleted &&
+                e.date === item.date &&
+                Math.abs(e.amount - item.amount) < 0.01 &&
+                e.description.trim().toLowerCase() === item.description.trim().toLowerCase()
+            );
+        };
+
+        const duplicates = selectedItems.filter(isDuplicate);
+        const nonDuplicates = selectedItems.filter(item => !isDuplicate(item));
+
+        const executeImport = (itemsToImport: ParsedBankTransaction[]) => {
+            if (itemsToImport.length === 0) {
+                setShowCsvModal(false);
+                Alert.alert('No New Expenses', 'All selected items were duplicates and were skipped.');
+                return;
+            }
+
+            const expensesToAdd = itemsToImport.map(item => ({
+                amount: item.amount,
+                description: item.description,
+                category: item.category,
+                date: item.date,
+                source: 'bank_statement' as const,
+            }));
+
+            addExpense(expensesToAdd);
+            setShowCsvModal(false);
+
+            Alert.alert(
+                'Import Successful',
+                `Successfully imported ${itemsToImport.length} expenses from bank statement!`,
+                [{ text: 'OK' }]
+            );
+        };
+
+        if (duplicates.length > 0) {
+            Alert.alert(
+                'Potential Duplicates Detected',
+                `${duplicates.length} of the ${selectedItems.length} selected transaction(s) match existing expenses with the same date, amount, and description.\n\nWould you like to skip duplicates?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Skip Duplicates', onPress: () => executeImport(nonDuplicates) },
+                    { text: 'Import All', onPress: () => executeImport(selectedItems) },
+                ]
+            );
+        } else {
+            executeImport(selectedItems);
+        }
+    };
 
     const styles = createStyles(colors);
 
@@ -285,6 +396,55 @@ export default function SettingsScreen() {
                 </View>
 
                 <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Financial Tracking Mode</Text>
+                    <View style={[styles.settingItem, { borderBottomWidth: 0, paddingBottom: 6 }]}>
+                        <View style={styles.settingLeft}>
+                            <Sliders size={20} color={colors.text} />
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.settingLabel}>Dashboard Mode</Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+                                    {dashboardMode === 'income'
+                                        ? 'Income mode: Track monthly salary, cash flow & net savings'
+                                        : 'Budget mode: Track spending limits, remaining allowance & daily caps'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                    <View style={styles.modeToggleContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.modeToggleButton,
+                                dashboardMode === 'budget' && [styles.modeToggleActive, { backgroundColor: colors.primary }]
+                            ]}
+                            onPress={() => setDashboardMode('budget')}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={[
+                                styles.modeToggleText,
+                                dashboardMode === 'budget' ? styles.modeToggleTextActive : { color: colors.text }
+                            ]}>
+                                Budget Mode
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.modeToggleButton,
+                                dashboardMode === 'income' && [styles.modeToggleActive, { backgroundColor: colors.primary }]
+                            ]}
+                            onPress={() => setDashboardMode('income')}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={[
+                                styles.modeToggleText,
+                                dashboardMode === 'income' ? styles.modeToggleTextActive : { color: colors.text }
+                            ]}>
+                                Income Mode
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Notifications</Text>
 
                     <View style={styles.settingItem}>
@@ -338,6 +498,74 @@ export default function SettingsScreen() {
                             thumbColor={colors.surface}
                         />
                     </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Auto-Tracking (UPI & Banks)</Text>
+
+                    <View style={[styles.settingItem, { borderBottomWidth: 0, paddingBottom: 6 }]}>
+                        <View style={styles.settingLeft}>
+                            <Smartphone size={20} color={colors.text} />
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.settingLabel}>Track UPI & Bank Alerts</Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+                                    Auto-records expenses from Google Pay, PhonePe, Paytm, CRED and Banks on-device.
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={isAutoTrackingEnabled}
+                            onValueChange={setAutoTrackingEnabled}
+                            trackColor={{ false: colors.border, true: colors.primary }}
+                            thumbColor={colors.surface}
+                        />
+                    </View>
+
+                    {isAutoTrackingEnabled && (
+                        <TouchableOpacity
+                            style={[styles.testTrackingButton, { borderColor: colors.border }]}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Test Auto-Tracking',
+                                    'Simulate a payment notification:',
+                                    [
+                                        {
+                                            text: 'GPay ₹450 (Swiggy)',
+                                            onPress: async () => {
+                                                const res = await processNotification(
+                                                    'Paid to Swiggy',
+                                                    '₹450.00 paid to Swiggy with Bank Account **1234',
+                                                    'com.google.android.apps.nbu.paisa.user'
+                                                );
+                                                if (res.success) {
+                                                    Alert.alert('Auto-Tracked!', 'Successfully recorded ₹450 to Swiggy under Food category.');
+                                                }
+                                            }
+                                        },
+                                        {
+                                            text: 'PhonePe ₹120 (Chai)',
+                                            onPress: async () => {
+                                                const res = await processNotification(
+                                                    'Payment of ₹120 successful',
+                                                    'Paid to Chai Point using HDFC Bank **5678',
+                                                    'com.phonepe.app'
+                                                );
+                                                if (res.success) {
+                                                    Alert.alert('Auto-Tracked!', 'Successfully recorded ₹120 to Chai Point under Food category.');
+                                                }
+                                            }
+                                        },
+                                        { text: 'Cancel', style: 'cancel' }
+                                    ]
+                                );
+                            }}
+                        >
+                            <Zap size={16} color={colors.primary} />
+                            <Text style={[styles.testTrackingText, { color: colors.primary }]}>
+                                Test Notification Auto-Capture
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.section}>
@@ -407,6 +635,19 @@ export default function SettingsScreen() {
                             </View>
                         </View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.dataButton}
+                        onPress={handleImportCsv}
+                        disabled={isImportingCsv}
+                    >
+                        <View style={styles.settingLeft}>
+                            <Landmark size={20} color={colors.primary} />
+                            <Text style={styles.dataButtonText}>
+                                {isImportingCsv ? 'Reading CSV...' : 'Import Bank Statement (.CSV)'}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.dataButton}
@@ -576,6 +817,13 @@ export default function SettingsScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <CsvImportModal
+                visible={showCsvModal}
+                onClose={() => setShowCsvModal(false)}
+                transactions={csvTransactions}
+                onImport={handleConfirmCsvImport}
+            />
         </SafeAreaView>
     );
 }
@@ -614,6 +862,51 @@ const createStyles = (colors: any) => StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
+    },
+    modeToggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: colors.background,
+        borderRadius: 12,
+        padding: 4,
+        marginTop: 6,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    modeToggleButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modeToggleActive: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    modeToggleText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    modeToggleTextActive: {
+        color: '#FFFFFF',
+    },
+    testTrackingButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 10,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    testTrackingText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     currencySelectorContainer: {
         flexDirection: 'row',

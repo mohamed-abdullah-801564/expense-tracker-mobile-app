@@ -10,9 +10,9 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    SafeAreaView,
     DeviceEventEmitter,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bot, Send } from 'lucide-react-native';
 
 import { useExpenses } from '@/hooks/expense-store';
@@ -78,7 +78,7 @@ export function FloatingAIAssistant() {
         } finally {
             setIsLoading(false);
         }
-    }, [allExpenses, budgetProgress, friendSummaries, input, isLoading]);
+    }, [allExpenses, budgetProgress, budgetHistory, friendSummaries, input, isLoading]);
 
     return (
         <>
@@ -117,15 +117,8 @@ export function FloatingAIAssistant() {
                                         key={`${message.role}-${index}`}
                                         style={[
                                             styles.messageBubble,
-                                            message.role === 'user'
-                                                ? [
-                                                    styles.userBubble,
-                                                    { backgroundColor: colors.primary },
-                                                ]
-                                                : [
-                                                    styles.aiBubble,
-                                                    { backgroundColor: colors.background },
-                                                ],
+                                            message.role === 'user' ? styles.userBubble : styles.aiBubble,
+                                            { backgroundColor: message.role === 'user' ? colors.primary : colors.background }
                                         ]}
                                     >
                                         <Text

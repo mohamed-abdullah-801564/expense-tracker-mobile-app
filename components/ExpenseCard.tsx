@@ -4,6 +4,7 @@ import { Expense } from '@/types/expense';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/categories';
 import * as LucideIcons from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
+import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { currencies } from '@/constants/currencies';
 import { getFallbackRate } from '@/utils/expense-parser';
@@ -23,6 +24,7 @@ const getSymbolFromCode = (code: string) => {
 
 export function ExpenseCard({ expense }: ExpenseCardProps) {
     const { deleteExpense } = useExpenses();
+    const { splitExpenses, deleteSplitExpense } = useSplitExpenses();
     const { colors, currencyCode, homeCurrencyCode } = useTheme();
     const styles = createStyles(colors);
     
@@ -91,7 +93,11 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => deleteExpense(expense.id)
+                    onPress: () => {
+                        deleteExpense(expense.id);
+                        const linkedSplits = splitExpenses.filter(s => s.expenseId === expense.id);
+                        linkedSplits.forEach(s => deleteSplitExpense(s.id));
+                    }
                 }
             ]
         );
@@ -164,6 +170,11 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                     {!expense.isRemittance && <Text style={styles.date}>{formatDate(expense.date)}</Text>}
                     {expense.time && (
                         <Text style={styles.time}>{expense.time}</Text>
+                    )}
+                    {expense.source === 'auto_upi' && (
+                        <View style={{ backgroundColor: colors.primary + '18', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>UPI</Text>
+                        </View>
                     )}
                 </View>
             </View>

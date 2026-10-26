@@ -2,6 +2,67 @@
 let lastRequestTime = 0;
 const COOLDOWN_MS = 10000;
 
+function summarizeContext(contextData: any) {
+    if (!contextData || typeof contextData !== 'object') return contextData;
+
+    let expensesSummary: any = undefined;
+    if (Array.isArray(contextData.expenses)) {
+        const expenses = contextData.expenses;
+        const totalCount = expenses.length;
+        let totalSpent = 0;
+        const categoryTotals: Record<string, number> = {};
+
+        for (const exp of expenses) {
+            const amt = Number(exp.amount) || 0;
+            totalSpent += amt;
+            const cat = exp.category || 'Other';
+            categoryTotals[cat] = Math.round(((categoryTotals[cat] || 0) + amt) * 100) / 100;
+        }
+
+        // Keep the most recent 25 expenses with minimal fields
+        const recentExpenses = expenses.slice(0, 25).map((exp: any) => ({
+            description: exp.description,
+            amount: exp.amount,
+            category: exp.category,
+            date: exp.date,
+        }));
+
+        expensesSummary = {
+            totalExpensesRecorded: totalCount,
+            totalSpentAllTime: Math.round(totalSpent * 100) / 100,
+            spendingByCategory: categoryTotals,
+            recentExpenses,
+        };
+    }
+
+    let budgetHistorySummary: any = undefined;
+    if (Array.isArray(contextData.budgetHistory)) {
+        budgetHistorySummary = contextData.budgetHistory.slice(0, 5).map((b: any) => ({
+            period: `${b.startDate} to ${b.endDate}`,
+            totalAmount: b.totalAmount,
+            spent: b.spent,
+            status: b.status,
+        }));
+    }
+
+    let friendsSummary: any = undefined;
+    if (Array.isArray(contextData.friends)) {
+        friendsSummary = contextData.friends.map((f: any) => ({
+            name: f.name,
+            netBalance: f.netBalance,
+            lent: f.lent,
+            borrowed: f.borrowed,
+        }));
+    }
+
+    return {
+        financialSummary: expensesSummary || contextData.expenses,
+        currentBudget: contextData.budget,
+        recentBudgets: budgetHistorySummary || contextData.budgetHistory,
+        friendsSplitDebts: friendsSummary || contextData.friends,
+    };
+}
+
 export async function askGeminiAssistant(prompt: string, contextData: any): Promise<string> {
     const now = Date.now();
     if (now - lastRequestTime < COOLDOWN_MS) {
@@ -16,19 +77,22 @@ export async function askGeminiAssistant(prompt: string, contextData: any): Prom
     lastRequestTime = now;
 
     try {
+        const compactContext = summarizeContext(contextData);
         const combinedPrompt = `
 Context Data (JSON):
-${JSON.stringify(contextData)}
+${JSON.stringify(compactContext)}
 
 User Question:
 ${prompt}
 `;
 
+        const appSecret = process.env.EXPO_PUBLIC_APP_SECRET;
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                ...(appSecret ? { 'x-app-secret': appSecret } : {}),
             },
             body: JSON.stringify({
                 prompt: combinedPrompt,

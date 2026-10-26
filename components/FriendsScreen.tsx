@@ -57,6 +57,11 @@ export default function FriendsScreen() {
         const parsed = parseDebt(inputToParse);
 
         if (parsed) {
+            if (parsed.amount <= 0) {
+                Alert.alert("Invalid Amount", "Amount must be greater than zero.");
+                return;
+            }
+
             const newSplit: SplitExpense = {
                 id: Date.now().toString(),
                 expenseId: `debt_${Date.now()}`,
@@ -103,8 +108,9 @@ export default function FriendsScreen() {
     };
 
     const handleQuickSubmit = (type: 'lend' | 'borrow') => {
-        if (!quickAmount || isNaN(parseFloat(quickAmount))) {
-            Alert.alert("Invalid Input", "Please enter a valid amount.");
+        const parsedAmount = parseFloat(quickAmount);
+        if (!quickAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+            Alert.alert("Invalid Amount", "Please enter an amount greater than zero.");
             return;
         }
 
@@ -112,7 +118,7 @@ export default function FriendsScreen() {
             id: Date.now().toString(),
             expenseId: `quick_${Date.now()}`,
             friendName: quickAction.friendName,
-            amount: parseFloat(quickAmount),
+            amount: parsedAmount,
             description: quickDescription.trim() || 'Quick Update',
             category: 'Other',
             date: new Date().toISOString(),

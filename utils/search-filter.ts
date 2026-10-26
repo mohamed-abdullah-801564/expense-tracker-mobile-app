@@ -14,20 +14,19 @@ export function parseUserDateString(dateStr: string): string | null {
     if (!dateStr) return null;
     const trimmed = dateStr.trim();
 
-    // DD/MM/YYYY format
-    const ddmmyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-    const match1 = trimmed.match(ddmmyyyy);
-    if (match1) {
-        const [, day, month, year] = match1;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-
-    // MM/DD/YYYY format
-    const mmddyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-    const match2 = trimmed.match(mmddyyyy);
-    if (match2) {
-        const [, month, day, year] = match2;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    // DD/MM/YYYY or MM/DD/YYYY format
+    const slashDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const match = trimmed.match(slashDate);
+    if (match) {
+        let [, p1, p2, year] = match;
+        let day = parseInt(p1, 10);
+        let month = parseInt(p2, 10);
+        if (month > 12 && day <= 12) {
+            const temp = day;
+            day = month;
+            month = temp;
+        }
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
 
     // YYYY-MM-DD format (ISO)
@@ -62,11 +61,12 @@ export function searchAndFilterExpenses(
     filters: SearchFilters
 ): FilteredExpenseResult[] {
     return expenses.filter(expense => {
-        // Search text filter (description, amount, or date)
+        // Search text filter (description, amount, date, or item names)
         if (filters.searchText) {
             const searchLower = filters.searchText.toLowerCase();
             const matchesDescription = expense.description.toLowerCase().includes(searchLower);
             const matchesAmount = expense.amount.toString().includes(searchLower);
+            const matchesItems = expense.items?.some(i => i.name.toLowerCase().includes(searchLower));
 
             // Improved date matching: convert both to Date objects for comparison
             let matchesDate = expense.date.includes(filters.searchText);
@@ -96,7 +96,7 @@ export function searchAndFilterExpenses(
                 }
             }
 
-            if (!matchesDescription && !matchesAmount && !matchesDate) {
+            if (!matchesDescription && !matchesAmount && !matchesDate && !matchesItems) {
                 return false;
             }
         }
@@ -116,6 +116,7 @@ export function searchAndFilterExpenses(
             if (filters.dateFrom) {
                 const fromDate = safeParseDate(filters.dateFrom);
                 if (fromDate && !isNaN(fromDate.getTime())) {
+                    fromDate.setHours(0, 0, 0, 0);
                     if (expenseDate < fromDate) return false;
                 }
             }
@@ -123,6 +124,7 @@ export function searchAndFilterExpenses(
             if (filters.dateTo) {
                 const toDate = safeParseDate(filters.dateTo);
                 if (toDate && !isNaN(toDate.getTime())) {
+                    toDate.setHours(23, 59, 59, 999);
                     if (expenseDate > toDate) return false;
                 }
             }

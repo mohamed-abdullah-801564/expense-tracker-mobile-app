@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Calculator, Minus, X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
+import { useExpenses } from '@/hooks/expense-store';
 
 interface DeductionChoiceModalProps {
     isVisible: boolean;
@@ -17,6 +18,7 @@ interface DeductionChoiceModalProps {
     onKeepFull: () => void;
     totalExpenses: number;
     budgetAmount: number;
+    asOverlay?: boolean;
 }
 
 export function DeductionChoiceModal({
@@ -26,9 +28,85 @@ export function DeductionChoiceModal({
     onKeepFull,
     totalExpenses,
     budgetAmount,
+    asOverlay = false,
 }: DeductionChoiceModalProps) {
     const { colors } = useTheme();
+    const { dashboardMode } = useExpenses();
+    const isIncome = dashboardMode === 'income';
     const remainingAfterDeduction = budgetAmount - totalExpenses;
+
+    if (!isVisible) return null;
+
+    const content = (
+        <View style={asOverlay ? [StyleSheet.absoluteFill, styles.overlay] : styles.overlay}>
+            <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContentContainer}
+                    showsVerticalScrollIndicator={true}
+                >
+                    <View style={styles.header}>
+                        <Text style={[styles.title, { color: colors.text }]}>
+                            {isIncome ? 'Income Setup' : 'Budget Setup'}
+                        </Text>
+                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                            <X size={20} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <Text style={[styles.message, { color: colors.textSecondary }]}>
+                        {isIncome
+                            ? 'Do you want to deduct existing expenses from your new income, or start with the full new income amount?'
+                            : 'Do you want to deduct the existing expenses from your new budget amount, or keep the full new budget amount?'}
+                    </Text>
+
+                    <View style={[styles.calculationInfo, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.calculationText, { color: colors.text }]}>
+                            {isIncome ? 'New Income: ' : 'New Budget: '}{colors.currencySymbol}{budgetAmount.toFixed(2)}
+                        </Text>
+                        <Text style={[styles.calculationText, { color: colors.text }]}>
+                            Existing Expenses: {colors.currencySymbol}{totalExpenses.toFixed(2)}
+                        </Text>
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity
+                            style={[styles.button, styles.deductButton]}
+                            onPress={onDeductExpenses}
+                        >
+                            <Minus size={20} color="white" />
+                            <View style={styles.buttonContent}>
+                                <Text style={styles.deductButtonText}>
+                                    Deduct Expenses
+                                </Text>
+                                <Text style={styles.buttonSubtext}>
+                                    {isIncome ? 'Net Savings: ' : 'Remaining: '}{colors.currencySymbol}{remainingAfterDeduction.toFixed(2)}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.button, styles.keepButton]}
+                            onPress={onKeepFull}
+                        >
+                            <Calculator size={20} color="white" />
+                            <View style={styles.buttonContent}>
+                                <Text style={styles.keepButtonText}>
+                                    Keep Full Amount
+                                </Text>
+                                <Text style={styles.buttonSubtext}>
+                                    {isIncome ? 'Full Income: ' : 'Balance: '}{colors.currencySymbol}{budgetAmount.toFixed(2)}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </View>
+        </View>
+    );
+
+    if (asOverlay) {
+        return content;
+    }
 
     return (
         <Modal
@@ -37,66 +115,7 @@ export function DeductionChoiceModal({
             transparent={true}
             onRequestClose={onClose}
         >
-            <View style={styles.overlay}>
-                <View style={[styles.modal, { backgroundColor: colors.surface }]}>
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContentContainer}
-                        showsVerticalScrollIndicator={true}
-                    >
-                        <View style={styles.header}>
-                            <Text style={[styles.title, { color: colors.text }]}>Budget Setup</Text>
-                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                                <X size={20} color={colors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={[styles.message, { color: colors.textSecondary }]}>
-                            Do you want to deduct the existing expenses from your new budget amount, or keep the full new budget amount?
-                        </Text>
-
-                        <View style={[styles.calculationInfo, { backgroundColor: colors.background }]}>
-                            <Text style={[styles.calculationText, { color: colors.text }]}>
-                                New Budget: {colors.currencySymbol}{budgetAmount.toFixed(2)}
-                            </Text>
-                            <Text style={[styles.calculationText, { color: colors.text }]}>
-                                Existing Expenses: {colors.currencySymbol}{totalExpenses.toFixed(2)}
-                            </Text>
-                        </View>
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity
-                                style={[styles.button, styles.deductButton]}
-                                onPress={onDeductExpenses}
-                            >
-                                <Minus size={20} color="white" />
-                                <View style={styles.buttonContent}>
-                                    <Text style={styles.deductButtonText}>
-                                        Deduct Expenses
-                                    </Text>
-                                    <Text style={styles.buttonSubtext}>
-                                        Remaining: {colors.currencySymbol}{remainingAfterDeduction.toFixed(2)}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.keepButton]}
-                                onPress={onKeepFull}
-                            >
-                                <Calculator size={20} color="white" />
-                                <View style={styles.buttonContent}>
-                                    <Text style={styles.keepButtonText}>
-                                        Keep Full Amount
-                                    </Text>
-                                    <Text style={styles.buttonSubtext}>
-                                        Balance: {colors.currencySymbol}{budgetAmount.toFixed(2)}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        </View>
-                    </ScrollView>
-                </View>
-            </View>
+            {content}
         </Modal>
     );
 }

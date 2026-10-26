@@ -10,36 +10,39 @@ interface BudgetCardProps {
 }
 
 export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
-    const { budgetProgress, clearBudget, setBudgetData } = useExpenses();
-    const { colors, currencyCode } = useTheme();
-    const exchangeRate = useExchangeRate('INR', currencyCode);
+    const { budgetProgress, clearBudget, setBudgetData, dashboardMode } = useExpenses();
+    const { colors } = useTheme();
     const [showTopUp, setShowTopUp] = useState(false);
     const [topUpAmount, setTopUpAmount] = useState('');
     const styles = createStyles(colors);
+    const isIncome = dashboardMode === 'income';
 
     const handleTopUp = () => {
-        if (!topUpAmount || isNaN(parseFloat(topUpAmount))) {
-            Alert.alert("Invalid Amount", "Please enter a valid number.");
+        const inputAmount = parseFloat(topUpAmount);
+        if (!topUpAmount || isNaN(inputAmount) || inputAmount <= 0) {
+            Alert.alert("Invalid Amount", "Please enter a valid amount greater than zero.");
             return;
         }
 
-        const inputAmount = parseFloat(topUpAmount);
-        const baseAmount = exchangeRate > 0 ? inputAmount / exchangeRate : inputAmount;
         const days = budgetProgress?.budget?.days ?? 0;
-        setBudgetData(baseAmount, days, 'add');
+        setBudgetData(inputAmount, days, 'add');
 
         setShowTopUp(false);
         setTopUpAmount('');
-        Alert.alert("Success", "Budget updated successfully!");
+        Alert.alert("Success", isIncome ? "Income updated successfully!" : "Budget updated successfully!");
     };
 
     if (!budgetProgress) {
         return (
             <TouchableOpacity style={styles.noBudgetCard} onPress={onSetBudget}>
                 <Target size={24} color={colors.primary} />
-                <Text style={styles.noBudgetTitle}>Set Your Budget</Text>
+                <Text style={styles.noBudgetTitle}>
+                    {isIncome ? 'Set Monthly Income' : 'Set Your Budget'}
+                </Text>
                 <Text style={styles.noBudgetSubtitle}>
-                    Track your spending against a budget goal
+                    {isIncome
+                        ? 'Track salary, expenses, and monthly savings'
+                        : 'Track your spending against a budget goal'}
                 </Text>
             </TouchableOpacity>
         );
@@ -57,12 +60,12 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
 
     const getStatusText = () => {
         if (budgetProgress.isExpired) {
-            return 'Budget Expired';
+            return isIncome ? 'Month Ended' : 'Budget Expired';
         }
         if (budgetProgress.isOverBudget) {
-            return 'Over Budget';
+            return isIncome ? 'In Deficit' : 'Over Budget';
         }
-        return 'On Track';
+        return isIncome ? 'Healthy Savings' : 'On Track';
     };
 
     const getStatusColor = () => {
@@ -79,21 +82,24 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
         ? Math.max(0, budgetProgress.remaining) / budgetProgress.daysRemaining
         : 0;
 
-    const convertedRemaining = budgetProgress.remaining * exchangeRate;
-    const convertedTotalAmount = budgetProgress.budget.amount * exchangeRate;
-    const convertedDailyLimit = dailyLimit * exchangeRate;
+    const convertedRemaining = budgetProgress.remaining;
+    const isDeficit = convertedRemaining < 0;
+    const convertedTotalAmount = budgetProgress.budget.amount;
+    const convertedDailyLimit = dailyLimit;
 
     const handleClearBudget = () => {
         Alert.alert(
-            "Clear Budget",
-            "Are you sure you want to delete the current budget?",
+            isIncome ? "Reset Income" : "Clear Budget",
+            isIncome
+                ? "Are you sure you want to reset the current income and period?"
+                : "Are you sure you want to delete the current budget?",
             [
                 {
                     text: "Cancel",
                     style: "cancel"
                 },
                 {
-                    text: "Clear",
+                    text: isIncome ? "Reset" : "Clear",
                     style: "destructive",
                     onPress: clearBudget
                 }
@@ -107,7 +113,9 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
             <View style={styles.header}>
                 <View style={styles.headerTitleRow}>
                     <Target size={18} color={colors.primary} style={styles.headerIcon} />
-                    <Text style={styles.headerTitle}>Budget Progress</Text>
+                    <Text style={styles.headerTitle}>
+                        {isIncome ? 'Monthly Cash Flow' : 'Budget Progress'}
+                    </Text>
                 </View>
                 <View style={[styles.statusPill, { backgroundColor: getStatusColor() + '20' }]}>
                     {getStatusIcon()}
@@ -119,13 +127,13 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
 
             {/* Main Content */}
             <View style={styles.mainContent}>
-                <Text style={[styles.remainingAmount, { color: colors.text }]}>
-                    {colors.currencySymbol}{convertedRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <Text style={[styles.remainingAmount, { color: isDeficit ? colors.error : colors.text }]}>
+                    {isDeficit ? '-' : ''}{colors.currencySymbol}{Math.abs(convertedRemaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
 
                 <View style={styles.totalRow}>
                     <Text style={styles.totalText}>
-                        of {colors.currencySymbol}{convertedTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+                        of {colors.currencySymbol}{convertedTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {isIncome ? 'income' : 'total'}
                     </Text>
                     <TouchableOpacity onPress={() => setShowTopUp(true)} style={styles.topUpButton}>
                         <Plus size={14} color="white" />
@@ -153,7 +161,7 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
                 <View style={styles.footerItem}>
                     <Text style={[styles.footerHighlight, { color: colors.primary }]}>
                         {colors.currencySymbol}{convertedDailyLimit.toFixed(0)}
-                        <Text style={styles.footerLabel}>/day limit</Text>
+                        <Text style={styles.footerLabel}>{isIncome ? '/day safe spend' : '/day limit'}</Text>
                     </Text>
                 </View>
                 <View style={styles.footerItem}>
@@ -165,7 +173,9 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
 
             {/* Actions */}
             <TouchableOpacity style={styles.clearAction} onPress={handleClearBudget}>
-                <Text style={[styles.clearActionText, { color: colors.textSecondary }]}>Clear Budget</Text>
+                <Text style={[styles.clearActionText, { color: colors.textSecondary }]}>
+                    {isIncome ? 'Reset Income' : 'Clear Budget'}
+                </Text>
             </TouchableOpacity>
 
             {/* Top Up Modal */}
@@ -178,14 +188,18 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Add to Budget</Text>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>
+                                {isIncome ? 'Add to Income' : 'Add to Budget'}
+                            </Text>
                             <TouchableOpacity onPress={() => setShowTopUp(false)}>
                                 <X size={24} color={colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                            Increase your budget amount for the current period.
+                            {isIncome
+                                ? 'Increase your monthly income for the current period.'
+                                : 'Increase your budget amount for the current period.'}
                         </Text>
 
                         <TextInput
@@ -202,7 +216,7 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
                             style={[styles.saveButton, { backgroundColor: colors.primary }]}
                             onPress={handleTopUp}
                         >
-                            <Text style={styles.saveButtonText}>Add Amount</Text>
+                            <Text style={styles.saveButtonText}>{isIncome ? 'Add Income' : 'Add Amount'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

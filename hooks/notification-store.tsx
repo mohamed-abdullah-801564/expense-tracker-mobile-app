@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/theme-store';
 
 const NOTIFICATION_SETTINGS_KEY = 'notification_settings';
 const RECURRING_BILLS_KEY = 'recurring_bills';
+const BUDGET_NOTIFIED_KEY = 'budget_notified_state';
 
 const defaultSettings: NotificationSettings = {
     budgetAlerts: true,
@@ -42,12 +43,34 @@ function useCreateNotificationContext() {
     const { colors } = useTheme();
     const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
     const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
-    const [hasNotifiedBudget80, setHasNotifiedBudget80] = useState<boolean>(false);
-    const [hasNotifiedBudget100, setHasNotifiedBudget100] = useState<boolean>(false);
+    const [budgetNotifiedState, setBudgetNotifiedState] = useState<{
+        budgetKey: string;
+        notified80: boolean;
+        notified100: boolean;
+        notifiedEnd: boolean;
+    }>({
+        budgetKey: '',
+        notified80: false,
+        notified100: false,
+        notifiedEnd: false,
+    });
     const budgetNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const dailyLimitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastBudgetPercentageRef = useRef<number>(0);
     const lastDailyTotalRef = useRef<number>(0);
+    const notifiedBillsTodayRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        AsyncStorage.getItem(BUDGET_NOTIFIED_KEY).then(stored => {
+            if (stored) {
+                try {
+                    setBudgetNotifiedState(JSON.parse(stored));
+                } catch (e) {
+                    console.error('Error loading budget notified state:', e);
+                }
+            }
+        });
+    }, []);
 
     const settingsQuery = useQuery({
         queryKey: ['notification_settings'],
@@ -201,34 +224,53 @@ function useCreateNotificationContext() {
             return;
         }
 
-        const { percentageUsed } = budgetProgress;
-
-        if (Math.abs(percentageUsed - lastBudgetPercentageRef.current) < 0.5) {
-            return;
-        }
+        const { percentageUsed, budget } = budgetProgress;
+        const currentBudgetKey = `${budget.startDate}_${budget.endDate}_${budget.amount}`;
 
         if (budgetNotificationTimeoutRef.current) {
             clearTimeout(budgetNotificationTimeoutRef.current);
         }
 
         budgetNotificationTimeoutRef.current = setTimeout(() => {
-            if (percentageUsed >= 100 && !hasNotifiedBudget100) {
+            let nextState = { ...budgetNotifiedState };
+            let hasChanged = false;
+
+            if (nextState.budgetKey !== currentBudgetKey) {
+                nextState = {
+                    budgetKey: currentBudgetKey,
+                    notified80: false,
+                    notified100: false,
+                    notifiedEnd: false,
+                };
+                hasChanged = true;
+            }
+
+            if (percentageUsed >= 100 && !nextState.notified100) {
                 scheduleNotification(
                     'Budget Exceeded!',
                     `You've exceeded your budget by ${colors.currencySymbol}${Math.abs(budgetProgress.remaining).toFixed(2)}`
                 );
-                setHasNotifiedBudget100(true);
-            } else if (percentageUsed >= 80 && percentageUsed < 100 && !hasNotifiedBudget80) {
+                nextState.notified100 = true;
+                nextState.notified80 = true;
+                hasChanged = true;
+            } else if (percentageUsed >= 80 && percentageUsed < 100 && !nextState.notified80) {
                 scheduleNotification(
                     'Budget Alert',
                     `You've used ${percentageUsed.toFixed(1)}% of your budget. ${colors.currencySymbol}${budgetProgress.remaining.toFixed(2)} remaining.`
                 );
-                setHasNotifiedBudget80(true);
+                nextState.notified80 = true;
+                hasChanged = true;
             }
 
-            if (percentageUsed < 80) {
-                setHasNotifiedBudget80(false);
-                setHasNotifiedBudget100(false);
+            if (percentageUsed < 80 && (nextState.notified80 || nextState.notified100)) {
+                nextState.notified80 = false;
+                nextState.notified100 = false;
+                hasChanged = true;
+            }
+
+            if (hasChanged) {
+                setBudgetNotifiedState(nextState);
+                AsyncStorage.setItem(BUDGET_NOTIFIED_KEY, JSON.stringify(nextState)).catch(console.error);
             }
 
             lastBudgetPercentageRef.current = percentageUsed;
@@ -239,7 +281,7 @@ function useCreateNotificationContext() {
                 clearTimeout(budgetNotificationTimeoutRef.current);
             }
         };
-    }, [budgetProgress, settings.budgetAlerts, hasNotifiedBudget80, hasNotifiedBudget100, scheduleNotification, colors.currencySymbol]);
+    }, [budgetProgress, settings.budgetAlerts, budgetNotifiedState, scheduleNotification, colors.currencySymbol]);
 
     useEffect(() => {
         if (!settings.dailyLimitAlerts || !budgetProgress) {
@@ -288,34 +330,83 @@ function useCreateNotificationContext() {
     }, [allExpenses, budgetProgress, settings.dailyLimitAlerts, scheduleNotification, colors.currencySymbol]);
 
     useEffect(() => {
-        if (!settings.recurringBillReminders) return;
+        if (!settings.recurringBillReminders || recurringBills.length === 0) return;
 
+        const today = new Date();
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        recurringBills.forEach(bill => {
-            if (!bill.isActive) return;
+        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        let billsUpdated = false;
+        const updatedBills = recurringBills.map(bill => {
+            if (!bill.isActive) return bill;
 
             const dueDate = new Date(bill.dueDate);
+            if (isNaN(dueDate.getTime())) return bill;
+
+            // Check if reminder is due for tomorrow and not yet scheduled today
             if (dueDate.toDateString() === tomorrow.toDateString()) {
-                scheduleNotification(
-                    'Bill Reminder',
-                    `${bill.name} (${colors.currencySymbol}${bill.amount}) is due tomorrow`
-                );
+                const reminderKey = `${bill.id}_${tomorrow.toISOString().split('T')[0]}`;
+                if (!notifiedBillsTodayRef.current.has(reminderKey)) {
+                    notifiedBillsTodayRef.current.add(reminderKey);
+                    scheduleNotification(
+                        'Bill Reminder',
+                        `${bill.name} (${colors.currencySymbol}${bill.amount}) is due tomorrow`
+                    );
+                }
             }
+
+            // Auto-advance due date if it has passed
+            const dueMidnight = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            if (dueMidnight < todayMidnight) {
+                const nextDate = new Date(dueMidnight);
+                if (bill.frequency === 'weekly') {
+                    while (nextDate <= todayMidnight) {
+                        nextDate.setDate(nextDate.getDate() + 7);
+                    }
+                } else if (bill.frequency === 'yearly') {
+                    while (nextDate <= todayMidnight) {
+                        nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    }
+                } else {
+                    // monthly default
+                    while (nextDate <= todayMidnight) {
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    }
+                }
+                billsUpdated = true;
+                const year = nextDate.getFullYear();
+                const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+                const day = String(nextDate.getDate()).padStart(2, '0');
+                return { ...bill, dueDate: `${year}-${month}-${day}` };
+            }
+
+            return bill;
         });
-    }, [recurringBills, settings.recurringBillReminders, scheduleNotification, colors.currencySymbol]);
+
+        if (billsUpdated) {
+            setRecurringBills(updatedBills);
+            saveBills(updatedBills);
+        }
+    }, [recurringBills, settings.recurringBillReminders, scheduleNotification, colors.currencySymbol, saveBills]);
 
     useEffect(() => {
         if (!settings.budgetPeriodReminders || !budgetProgress) return;
 
-        if (budgetProgress.daysRemaining === 1) {
+        const { budget } = budgetProgress;
+        const currentBudgetKey = `${budget.startDate}_${budget.endDate}_${budget.amount}`;
+
+        if (budgetProgress.daysRemaining === 1 && budgetNotifiedState.budgetKey === currentBudgetKey && !budgetNotifiedState.notifiedEnd) {
             scheduleNotification(
                 'Budget Period Ending',
                 'Your current budget period ends tomorrow. Consider setting a new budget.'
             );
+            const nextState = { ...budgetNotifiedState, notifiedEnd: true };
+            setBudgetNotifiedState(nextState);
+            AsyncStorage.setItem(BUDGET_NOTIFIED_KEY, JSON.stringify(nextState)).catch(console.error);
         }
-    }, [budgetProgress, settings.budgetPeriodReminders, scheduleNotification]);
+    }, [budgetProgress, settings.budgetPeriodReminders, budgetNotifiedState, scheduleNotification]);
 
     return {
         settings,

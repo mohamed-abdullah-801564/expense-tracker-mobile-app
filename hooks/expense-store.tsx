@@ -2,7 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Expense, ExpenseCategory, CategoryStats, Budget, BudgetTransaction } from '@/types/expense';
+import { Expense, ExpenseCategory, CategoryStats, Budget, BudgetTransaction, DashboardMode } from '@/types/expense';
 import { CATEGORIES } from '@/constants/categories';
 import { useTheme } from '@/hooks/theme-store';
 
@@ -12,6 +12,7 @@ const BUDGET_HISTORY_STORAGE_KEY = 'budget_history';
 const BACKUP_STORAGE_KEY = 'expense_backup';
 const EXPENSES_COUNT_KEY = 'total_expenses_added';
 const STORAGE_VERSION_KEY = 'storage_version';
+const DASHBOARD_MODE_STORAGE_KEY = 'dashboard_mode';
 const CURRENT_STORAGE_VERSION = '1.0';
 
 // Enhanced storage utilities with error handling and backup
@@ -142,6 +143,7 @@ function useCreateExpenseContext() {
     const [totalExpensesAdded, setTotalExpensesAdded] = useState<number>(0);
     const [isAiModalVisible, setIsAiModalVisible] = useState(false);
     const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
+    const [dashboardMode, setDashboardModeState] = useState<DashboardMode>('budget');
 
     // Initialize storage validation on first load
     useEffect(() => {
@@ -150,7 +152,19 @@ function useCreateExpenseContext() {
             const count = await StorageUtils.safeGet(EXPENSES_COUNT_KEY, 0);
             setTotalExpensesAdded(count);
         };
+        const loadDashboardMode = async () => {
+            const mode = await StorageUtils.safeGet(DASHBOARD_MODE_STORAGE_KEY, 'budget');
+            if (mode === 'income' || mode === 'budget') {
+                setDashboardModeState(mode);
+            }
+        };
         loadCount();
+        loadDashboardMode();
+    }, []);
+
+    const setDashboardMode = useCallback((mode: DashboardMode) => {
+        setDashboardModeState(mode);
+        AsyncStorage.setItem(DASHBOARD_MODE_STORAGE_KEY, JSON.stringify(mode)).catch(console.error);
     }, []);
 
     // Load expenses from AsyncStorage with enhanced error handling
@@ -276,7 +290,8 @@ function useCreateExpenseContext() {
         }
     }, [budgetHistoryQuery.data]);
 
-    const addExpense = useCallback((expenseOrExpenses: Omit<Expense, 'id' | 'createdAt'> | Omit<Expense, 'id' | 'createdAt'>[]) => {
+    type ExpenseInput = Omit<Expense, 'id' | 'createdAt'> & { id?: string; createdAt?: string };
+    const addExpense = useCallback((expenseOrExpenses: ExpenseInput | ExpenseInput[]) => {
         const itemsToAdd = Array.isArray(expenseOrExpenses) ? expenseOrExpenses : [expenseOrExpenses];
         
         setExpenses(prev => {
@@ -293,7 +308,7 @@ function useCreateExpenseContext() {
 
                 return {
                     ...item,
-                    id: `${now}-${Math.floor(Math.random() * 100000000)}-${index}`,
+                    id: (item as any).id || `${now}-${Math.floor(Math.random() * 100000000)}-${index}`,
                     date: validDate,
                     createdAt: (item as any).createdAt || isoNow,
                 };
@@ -326,12 +341,21 @@ function useCreateExpenseContext() {
         saveExpenses([]);
     }, [saveExpenses]);
 
-    const setBudgetData = useCallback((budgetAmount: number, budgetDays: number, type: 'add' | 'replace' = 'replace', deductExistingExpenses: boolean = false) => {
+    const setBudgetData = useCallback((
+        budgetAmount: number,
+        budgetDays: number,
+        type: 'add' | 'replace' = 'replace',
+        deductExistingExpenses: boolean = false,
+        autoRenew: boolean = false
+    ) => {
         let finalAmount = budgetAmount;
         let description = '';
         let startDate = new Date();
         let endDate = new Date();
         endDate.setDate(startDate.getDate() + budgetDays);
+
+        const isIncome = dashboardMode === 'income';
+        const targetLabel = isIncome ? 'income' : 'budget';
 
         if (type === 'add' && budget) {
             // Keep existing dates
@@ -339,13 +363,23 @@ function useCreateExpenseContext() {
             endDate = new Date(budget.endDate);
 
             finalAmount = budget.amount + budgetAmount;
-            description = `Added ${colors.currencySymbol}${budgetAmount} to existing budget of ${colors.currencySymbol}${budget.amount}`;
+            description = `Added ${colors.currencySymbol}${budgetAmount} to existing ${targetLabel} of ${colors.currencySymbol}${budget.amount}`;
         } else {
-            description = `Set new budget of ${colors.currencySymbol}${budgetAmount} for ${budgetDays} days`;
+            description = `Set new ${targetLabel} of ${colors.currencySymbol}${budgetAmount} for ${budgetDays} days`;
         }
 
         if (deductExistingExpenses) {
-            const totalExpenses = expenses.filter(e => !e.isDeleted).reduce((sum, exp) => sum + exp.amount, 0);
+            const periodStart = new Date(startDate);
+            periodStart.setHours(0, 0, 0, 0);
+            const periodEnd = new Date(endDate);
+            periodEnd.setHours(23, 59, 59, 999);
+
+            const relevantExpenses = expenses.filter(e => {
+                if (e.isDeleted) return false;
+                const d = new Date(e.date);
+                return d >= periodStart && d <= periodEnd;
+            });
+            const totalExpenses = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             finalAmount = Math.max(0, finalAmount - totalExpenses);
             description += ` (deducted ${colors.currencySymbol}${totalExpenses} existing expenses)`;
         }
@@ -353,10 +387,11 @@ function useCreateExpenseContext() {
         const newBudget: Budget = {
             id: Date.now().toString(),
             amount: finalAmount,
-            days: type === 'add' && budget ? budget.days : budgetDays, // Keep existing days if adding, though technically days arg might be ignored primarily for dates
+            days: type === 'add' && budget ? budget.days : budgetDays,
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
             createdAt: new Date().toISOString(),
+            autoRenew: type === 'add' && budget ? (budget.autoRenew ?? autoRenew) : autoRenew,
         };
 
         const transaction: BudgetTransaction = {
@@ -375,7 +410,7 @@ function useCreateExpenseContext() {
         setBudgetHistory(updatedHistory);
         saveBudget(newBudget);
         saveBudgetHistory(updatedHistory);
-    }, [budget, expenses, budgetHistory, saveBudget, saveBudgetHistory, colors.currencySymbol]);
+    }, [budget, expenses, budgetHistory, saveBudget, saveBudgetHistory, colors.currencySymbol, dashboardMode]);
 
     const clearBudget = useCallback(() => {
         setBudget(null);
@@ -471,9 +506,51 @@ function useCreateExpenseContext() {
             percentageUsed,
             daysRemaining,
             isExpired,
-            isOverBudget: totalSpent > budget.amount
+            isOverBudget: totalSpent > budget.amount,
+            dashboardMode,
+            netSavings: remaining,
+            savingsRate: budget.amount > 0 ? Math.max(0, (remaining / budget.amount) * 100) : 0,
         };
-    }, [budget, expenses]);
+    }, [budget, expenses, dashboardMode]);
+
+    // Auto-renew budget/income cycle if autoRenew is enabled and period has expired
+    useEffect(() => {
+        if (!budget || !budget.autoRenew) return;
+
+        const now = new Date();
+        const budgetEnd = new Date(budget.endDate);
+
+        if (now > budgetEnd) {
+            const newStart = new Date();
+            const newEnd = new Date();
+            newEnd.setDate(newStart.getDate() + (budget.days || 30));
+
+            const renewedBudget: Budget = {
+                ...budget,
+                id: Date.now().toString(),
+                startDate: newStart.toISOString(),
+                endDate: newEnd.toISOString(),
+                createdAt: new Date().toISOString(),
+            };
+
+            const modeLabel = dashboardMode === 'income' ? 'monthly income' : 'budget';
+            const transaction: BudgetTransaction = {
+                id: Date.now().toString(),
+                type: 'replace',
+                amount: budget.amount,
+                previousAmount: budget.amount,
+                deductExistingExpenses: false,
+                createdAt: new Date().toISOString(),
+                description: `Auto-renewed ${modeLabel} of ${colors.currencySymbol}${budget.amount}`,
+            };
+
+            const updatedHistory = [transaction, ...budgetHistory];
+            setBudget(renewedBudget);
+            setBudgetHistory(updatedHistory);
+            saveBudget(renewedBudget);
+            saveBudgetHistory(updatedHistory);
+        }
+    }, [budget, budgetHistory, dashboardMode, colors.currencySymbol, saveBudget, saveBudgetHistory]);
 
     // Filter active expenses (non-deleted)
     const activeExpenses = useMemo(() => {
@@ -503,6 +580,8 @@ function useCreateExpenseContext() {
         clearBudget,
         budgetHistory,
         clearBudgetHistory,
+        dashboardMode,
+        setDashboardMode,
         isAiModalVisible,
         toggleAiModal: useCallback(() => setIsAiModalVisible(prev => !prev), []),
         isFeedbackModalVisible,

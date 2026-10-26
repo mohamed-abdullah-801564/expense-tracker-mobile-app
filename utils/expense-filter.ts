@@ -19,6 +19,7 @@ export interface FilteredExpenseResult {
     historicalConvertedAmount?: number;
     items?: Array<{ name: string; qty: number; total: number; category?: string }>;
     groupId?: string;
+    source?: Expense['source'];
 }
 
 export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult {
@@ -59,6 +60,7 @@ export function formatExpenseForDisplay(expense: Expense): FilteredExpenseResult
         historicalConvertedAmount: expense.historicalConvertedAmount,
         items: expense.items,
         groupId: expense.groupId,
+        source: expense.source,
     };
 }
 

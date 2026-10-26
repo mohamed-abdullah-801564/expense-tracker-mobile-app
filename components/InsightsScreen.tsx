@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, PieChart as PieChartIcon } from 'lucide-react-native';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { G, Path, Circle } from 'react-native-svg';
 import * as LucideIcons from 'lucide-react-native';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
@@ -115,6 +115,20 @@ export default function InsightsScreen() {
 
         let currentAngle = -90; 
         const segments = stats.items.map((stat, index) => {
+            if (stats.items.length === 1 || stat.percentage >= 99.99) {
+                return (
+                    <Circle
+                        key={index}
+                        cx={CENTER}
+                        cy={CENTER}
+                        r={RADIUS}
+                        stroke={stat.color}
+                        strokeWidth={STROKE_WIDTH}
+                        fill="none"
+                    />
+                );
+            }
+
             const angle = (stat.percentage / 100) * 360;
             const startAngle = currentAngle;
             currentAngle += angle;
@@ -149,7 +163,7 @@ export default function InsightsScreen() {
                     </Svg>
                     <View style={styles.chartInnerContent}>
                         <Text style={[styles.totalSpentText, { color: colors.text }]}>
-                            {colors.currencySymbol}{stats.total.toLocaleString('en-IN')}
+                            {colors.currencySymbol}{stats.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
@@ -228,7 +242,7 @@ export default function InsightsScreen() {
                                                 {item.category} <Text style={{ fontSize: 12, fontWeight: '400', color: colors.textSecondary }}>{item.percentage.toFixed(1)}%</Text>
                                             </Text>
                                             <Text style={[styles.categoryAmount, { color: colors.text }]}>
-                                                {colors.currencySymbol}{item.total.toLocaleString('en-IN')}
+                                                {colors.currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                             </Text>
                                         </View>
                                         <AnimatedProgressBar percentage={item.percentage} color={item.color} border={colors.border + '50'} />

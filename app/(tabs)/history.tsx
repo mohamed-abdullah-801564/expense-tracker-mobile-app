@@ -11,7 +11,7 @@ import {
     Platform,
     UIManager,
 } from 'react-native';
-import { Calendar, Clock, Filter, History as HistoryIcon, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Calendar, Clock, Filter, History as HistoryIcon, ChevronDown, ChevronUp, Landmark } from 'lucide-react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -59,13 +59,18 @@ function groupExpensesByGroupId(expenses: FilteredExpenseResult[]): FilteredExpe
             if (!existing.items) {
                 existing.items = [];
             }
-            // Add sub-item breakdown
-            existing.items.push({
-                name: exp.description,
-                qty: 1,
-                total: exp.amount,
-                category: exp.category
-            });
+            if (exp.items && exp.items.length > 0) {
+                for (const subItem of exp.items) {
+                    existing.items.push(subItem);
+                }
+            } else {
+                existing.items.push({
+                    name: exp.description,
+                    qty: 1,
+                    total: exp.amount,
+                    category: exp.category
+                });
+            }
 
             // Remittance accumulation
             if (exp.isRemittance) {
@@ -76,14 +81,16 @@ function groupExpensesByGroupId(expenses: FilteredExpenseResult[]): FilteredExpe
             }
         } else {
             // First item in this group
-            const items = exp.items ? [...exp.items] : [];
-            if (items.length === 0) {
-                items.push({
+            let items: any[] = [];
+            if (exp.items && exp.items.length > 0) {
+                items = [...exp.items];
+            } else {
+                items = [{
                     name: exp.description,
                     qty: 1,
                     total: exp.amount,
                     category: exp.category
-                });
+                }];
             }
             const groupItem: FilteredExpenseResult & { maxAmountCategory?: { category: any; amount: number } } = {
                 ...exp,
@@ -130,15 +137,11 @@ export default function HistoryScreen() {
 
     const debouncedSearchFilters = useDebounce(searchFilters, 300);
 
-    const filteredExpenses = useMemo(() => {
-        const timeFiltered = filterExpensesByType(allExpenses, selectedFilter);
-        // Use debounced filters for expensive filtering operation
-        return searchAndFilterExpenses(timeFiltered, debouncedSearchFilters);
-    }, [allExpenses, selectedFilter, debouncedSearchFilters]);
-
     const groupedFilteredExpenses = useMemo(() => {
-        return groupExpensesByGroupId(filteredExpenses);
-    }, [filteredExpenses]);
+        const timeFiltered = filterExpensesByType(allExpenses, selectedFilter);
+        const grouped = groupExpensesByGroupId(timeFiltered);
+        return searchAndFilterExpenses(grouped, debouncedSearchFilters);
+    }, [allExpenses, selectedFilter, debouncedSearchFilters]);
 
     const styles = createStyles(colors);
 
@@ -219,6 +222,12 @@ export default function HistoryScreen() {
                                     <Clock size={14} color={colors.textSecondary} />
                                     <Text style={styles.expenseTime}>{item.time}</Text>
                                 </>
+                            )}
+                            {item.source === 'bank_statement' && (
+                                <View style={styles.bankBadge}>
+                                    <Landmark size={11} color={colors.primary} />
+                                    <Text style={styles.bankBadgeText}>Bank Statement</Text>
+                                </View>
                             )}
                         </View>
                     ) : (
@@ -610,5 +619,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     subTableRowText: {
         fontSize: 13,
         fontWeight: '500',
+    },
+    bankBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: colors.background,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginLeft: 6,
+    },
+    bankBadgeText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: colors.primary,
     },
 });

@@ -94,10 +94,12 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
             throw new Error('EXPO_PUBLIC_PROXY_URL is not configured');
         }
 
+        const appSecret = process.env.EXPO_PUBLIC_APP_SECRET;
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(appSecret ? { 'x-app-secret': appSecret } : {}),
             },
             body: JSON.stringify({
                 prompt: input,
@@ -130,7 +132,8 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
 
         const parsed = JSON.parse(cleanedCompletion);
 
-        const validation = validateAmount(parsed.amount, currencySymbol);
+        const numAmount = Number(parsed.amount) || 0;
+        const validation = validateAmount(numAmount, currencySymbol);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
@@ -143,17 +146,26 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
             parsedCategory = 'Other';
         }
 
+        const formattedItems = Array.isArray(parsed.items) ? parsed.items.map((i: any) => ({
+            name: String(i.name || ''),
+            qty: Number(i.qty) || 1,
+            total: Number(i.total) || 0,
+            category: (i.category as ParsedExpense['category']) || 'Other',
+        })) : undefined;
+
+        const sharedAmount = parsed.shared_amount !== undefined ? Number(parsed.shared_amount) : undefined;
+
         return {
-            amount: parsed.amount,
-            description: parsed.description,
+            amount: numAmount,
+            description: String(parsed.description || 'Expense'),
             category: parsedCategory,
-            ...(parsed.time && { time: parsed.time }),
-            ...(parsed.shared_amount && { shared_amount: parsed.shared_amount }),
-            ...(parsed.paid_to && { paid_to: parsed.paid_to }),
-            ...(parsed.note && { note: parsed.note }),
+            ...(parsed.time && { time: String(parsed.time) }),
+            ...(sharedAmount !== undefined && !isNaN(sharedAmount) && { shared_amount: sharedAmount }),
+            ...(parsed.paid_to && { paid_to: String(parsed.paid_to) }),
+            ...(parsed.note && { note: String(parsed.note) }),
             isRemittance,
             remittanceCode: parsed.remittanceCode || homeCurrencyCode,
-            ...(parsed.items && { items: parsed.items }),
+            ...(formattedItems && { items: formattedItems }),
         };
     } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -167,35 +179,17 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
     }
 }
 
-function getItemCategory(name: string): ParsedExpense['category'] {
+export function getItemCategory(name: string): ParsedExpense['category'] {
     const lower = name.toLowerCase();
-    const remittanceKeywords = ["sent", "send", "transfer", "remit", "remittance", "family", "mom", "dad", "parent"];
-    if (remittanceKeywords.some(kw => lower.includes(kw))) return 'Remittance';
-
-    if (lower.includes('tea') || lower.includes('coffee') || lower.includes('chai') || lower.includes('boost') || lower.includes('bun') || lower.includes('samosa') || lower.includes('biscuit') || lower.includes('snack')) {
-        return 'Snacks';
-    }
-    if (lower.includes('water') || lower.includes('juice') || lower.includes('soda') || lower.includes('milkshake') || lower.includes('drink') || lower.includes('cool')) {
-        return 'Drinks';
-    }
-    if (lower.includes('food') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('breakfast') || lower.includes('rice') || lower.includes('biryani') || lower.includes('burger') || lower.includes('pizza') || lower.includes('meal') || lower.includes('milk') || lower.includes('sugar')) {
-        return 'Food';
-    }
-    if (lower.includes('bus') || lower.includes('taxi') || lower.includes('uber') || lower.includes('auto') || lower.includes('transport') || lower.includes('fuel') || lower.includes('petrol') || lower.includes('cab')) {
-        return 'Transport';
-    }
-    if (lower.includes('electricity') || lower.includes('gas') || lower.includes('internet') || lower.includes('rent') || lower.includes('bill')) {
-        return 'Utilities';
-    }
-    if (lower.includes('movie') || lower.includes('game') || lower.includes('cinema') || lower.includes('entertainment')) {
-        return 'Entertainment';
-    }
-    if (lower.includes('shopping') || lower.includes('clothes') || lower.includes('shoes') || lower.includes('shirt')) {
-        return 'Shopping';
-    }
-    if (lower.includes('doctor') || lower.includes('medicine') || lower.includes('hospital') || lower.includes('pharmacy')) {
-        return 'Health';
-    }
+    if (/\b(sent|send|transfer|transferred|remit|remittance|family|mom|dad|parents?)\b/i.test(lower)) return 'Remittance';
+    if (/\b(chai\s*point|chaayos|tea|coffee|chai|boost|bun|samosa|biscuits?|snacks?|bakery|sweets?)\b/i.test(lower)) return 'Snacks';
+    if (/\b(water|juices?|sodas?|milkshakes?|drinks?|beverages?|coke|pepsi)\b/i.test(lower)) return 'Drinks';
+    if (/\b(zomato|swiggy|dominos?|kfc|mcdonalds?|subway|restaurants?|cafes?|food|lunch|dinner|breakfast|rice|biryani|burgers?|pizzas?|meals?|milk|sugar|dosa|hotel)\b/i.test(lower)) return 'Food';
+    if (/\b(uber|ola|rapido|irctc|railways?|metro|indigo|flights?|bus(es)?|taxis?|autos?|transport|fuel|petrol|diesel|cabs?|shell|hpcl|bpcl|iocl|toll)\b/i.test(lower)) return 'Transport';
+    if (/\b(airtel|jio|vodafone|\bvi\b|recharge|broadband|bescom|mseb|electricity|gas|internet|rent|bills?|tata\s*play|dth)\b/i.test(lower)) return 'Utilities';
+    if (/\b(netflix|spotify|hotstar|bookmyshow|pvr|inox|prime|movies?|games?|cinema|entertainment|youtube)\b/i.test(lower)) return 'Entertainment';
+    if (/\b(amazon|flipkart|myntra|ajio|nykaa|dmart|d-mart|bigbasket|blinkit|zepto|instamart|shopping|clothes|shoes?|shirts?|decathlon)\b/i.test(lower)) return 'Shopping';
+    if (/\b(apollo|medplus|pharmeasy|1mg|cult|gym|doctors?|medicines?|hospitals?|pharmacy|clinics?)\b/i.test(lower)) return 'Health';
     return 'Other';
 }
 
@@ -204,15 +198,22 @@ function fallbackParser(input: string, currencySymbol: string = '₹', homeCurre
     const lowerInput = input.toLowerCase();
 
     // Multi-item regex parsing: matching item name followed by amount e.g., "coffee 50 lunch 100"
-    const pairRegex = new RegExp(`([a-zA-Z\\s&'-]+?)\\s+(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`, 'g');
+    const pairRegex = new RegExp(`([a-zA-Z\\s&'-]+?)\\s+(?:${escapedSymbol})?(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)`, 'g');
     const matches: Array<{ name: string; amount: number }> = [];
+    const nonItemWords = new Set(['split', 'at', 'with', 'by', 'pm', 'am', 'to', 'from', 'in', 'for', 'and']);
     let match;
 
     while ((match = pairRegex.exec(input)) !== null) {
         let name = match[1].trim();
-        const amount = parseFloat(match[2]);
+        const rawAmount = match[2].replace(/,/g, '');
+        const amount = parseFloat(rawAmount);
+
         if (amount > 0 && name.length > 0) {
             name = name.replace(/^(bought|paid for|had|got|i bought|i had|i paid|spent on)\s+/i, '').trim();
+            const lowerName = name.toLowerCase();
+            if (nonItemWords.has(lowerName) || /^split\b/i.test(lowerName) || /^at\b/i.test(lowerName)) {
+                continue;
+            }
             if (name.length > 0) {
                 matches.push({ name, amount });
             }
@@ -249,7 +250,7 @@ function fallbackParser(input: string, currencySymbol: string = '₹', homeCurre
         const description = items.map(i => i.name).join(', ');
 
         return {
-            amount: totalSum,
+            amount: Math.round(totalSum * 100) / 100,
             description,
             category: dominantCategory,
             items,
@@ -257,14 +258,14 @@ function fallbackParser(input: string, currencySymbol: string = '₹', homeCurre
     }
 
     // Single item fallback extraction
-    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
+    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)`);
     const amountMatch = input.match(amountRegex);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+    const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
 
     const timeMatch = input.match(/(\d{1,2}\s*(?:AM|PM|am|pm)|\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?|morning|afternoon|evening|night)/i);
     const time = timeMatch ? timeMatch[1] : undefined;
 
-    const cleanupRegex = new RegExp(`(?:${escapedSymbol})?\\d+(?:\\.\\d+)?`, 'g');
+    const cleanupRegex = new RegExp(`(?:${escapedSymbol})?(?:\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)`, 'g');
     let description = input.replace(cleanupRegex, '').trim();
     if (time) {
         description = description.replace(new RegExp(time.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').trim();

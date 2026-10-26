@@ -9,9 +9,9 @@ import {
     FlatList,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, Search, X, Check } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
 import { currencies, CountryCurrency } from '@/constants/currencies';
@@ -225,7 +225,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalBackdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     sheetContainer: {
         backgroundColor: colors.surface,

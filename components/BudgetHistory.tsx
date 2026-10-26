@@ -23,7 +23,7 @@ export function BudgetHistory({ transactions, onClose }: BudgetHistoryProps) {
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-IN', {
+        return date.toLocaleDateString(undefined, {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
@@ -130,7 +130,7 @@ const createStyles = (colors: any) => StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     backdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     sheet: {
         borderTopLeftRadius: 24,

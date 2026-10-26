@@ -6,11 +6,11 @@ export async function parseBudgetWithAI(input: string, currencySymbol: string = 
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
     try {
-        const systemPrompt = `You are an AI assistant that helps users set or update their budget for expense tracking. When given a natural language input, your task is to extract:
+        const systemPrompt = `You are an AI assistant that helps users set or update their budget or monthly income for financial tracking. When given a natural language input, your task is to extract:
 
-1. The total budget amount as a number.
-2. The budget duration in days as a number (convert weeks/months to days). If NO duration is mentioned, set this to null.
-3. Whether the user wants to ADD to an existing budget (e.g., "Add 500", "Increase by 1000", "Top up 200").
+1. The total budget or income amount as a number.
+2. The duration in days as a number (convert weeks/months/monthly to days. E.g., 'monthly', 'per month', or '1 month' = 30 days). If NO duration is mentioned, set this to null.
+3. Whether the user wants to ADD to an existing budget or income (e.g., "Add 500", "Increase by 1000", "Top up 200").
 
 Return the result in JSON format with keys:
 - budget_amount (number)
@@ -20,6 +20,12 @@ Return the result in JSON format with keys:
 Examples:
 Input: 'I want to set a budget of 4000 rupees for 1 week'
 Output: { "budget_amount": 4000, "budget_days": 7, "is_add_operation": false }
+
+Input: 'My monthly salary is 50,000'
+Output: { "budget_amount": 50000, "budget_days": 30, "is_add_operation": false }
+
+Input: 'Income 45000 for 1 month'
+Output: { "budget_amount": 45000, "budget_days": 30, "is_add_operation": false }
 
 Input: 'Add 1000 to my budget'
 Output: { "budget_amount": 1000, "budget_days": null, "is_add_operation": true }
@@ -35,10 +41,12 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
             throw new Error('EXPO_PUBLIC_PROXY_URL is not configured');
         }
 
+        const appSecret = process.env.EXPO_PUBLIC_APP_SECRET;
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(appSecret ? { 'x-app-secret': appSecret } : {}),
             },
             body: JSON.stringify({
                 prompt: input,
@@ -74,15 +82,20 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
 
         const parsed = JSON.parse(cleanedCompletion);
 
-        const validation = validateAmount(parsed.budget_amount, currencySymbol);
+        const numBudgetAmount = Number(parsed.budget_amount) || 0;
+        const validation = validateAmount(numBudgetAmount, currencySymbol);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
 
+        const numDays = parsed.budget_days !== null && parsed.budget_days !== undefined
+            ? Number(parsed.budget_days)
+            : null;
+
         return {
-            budget_amount: parsed.budget_amount,
-            budget_days: parsed.budget_days,
-            is_add_operation: parsed.is_add_operation
+            budget_amount: numBudgetAmount,
+            budget_days: numDays,
+            is_add_operation: Boolean(parsed.is_add_operation)
         };
     } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -98,11 +111,6 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
 }
 
 function fallbackBudgetParser(input: string, currencySymbol: string = '₹'): ParsedBudget {
-    const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Extract amount using dynamic regex, making the currency symbol optional
-    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d+(?:\\.\\d+)?)`);
-    const amountMatch = input.match(amountRegex);
-    const budget_amount = amountMatch ? parseFloat(amountMatch[1]) : 1000;
     const lowerInput = input.toLowerCase();
 
     // Detect add/increase intent
@@ -111,28 +119,39 @@ function fallbackBudgetParser(input: string, currencySymbol: string = '₹'): Pa
         lowerInput.includes('top up');
 
     let budget_days: number | null = null;
+    let textWithoutDuration = input;
 
-    // Look for specific day numbers
+    // Look for specific day numbers e.g., "10 days"
     const dayMatch = input.match(/(\d+)\s*days?/i);
     if (dayMatch) {
-        budget_days = parseInt(dayMatch[1]);
+        budget_days = parseInt(dayMatch[1], 10);
+        textWithoutDuration = textWithoutDuration.replace(dayMatch[0], '');
     } else {
         // Look for weeks
         const weekMatch = input.match(/(\d+)\s*weeks?/i);
         if (weekMatch) {
-            budget_days = parseInt(weekMatch[1]) * 7;
-        } else if (lowerInput.includes('week')) {
-            budget_days = 7;
-        } else if (lowerInput.includes('month')) {
-            budget_days = 30;
+            budget_days = parseInt(weekMatch[1], 10) * 7;
+            textWithoutDuration = textWithoutDuration.replace(weekMatch[0], '');
+        } else {
+            const monthMatch = input.match(/(\d+)\s*months?/i);
+            if (monthMatch) {
+                budget_days = parseInt(monthMatch[1], 10) * 30;
+                textWithoutDuration = textWithoutDuration.replace(monthMatch[0], '');
+            } else if (/\bweek\b/i.test(lowerInput)) {
+                budget_days = 7;
+                textWithoutDuration = textWithoutDuration.replace(/\bweek\b/i, '');
+            } else if (/\b(month|monthly|per\s*month)\b/i.test(lowerInput)) {
+                budget_days = 30;
+                textWithoutDuration = textWithoutDuration.replace(/\b(month|monthly|per\s*month)\b/i, '');
+            }
         }
     }
 
-    // Default to 30 days if no duration is specified and it's NOT an add operation
-    // This handles cases like "Budget 5000" -> 5000 for 30 days
-    if (budget_days === null && !is_add_operation) {
-        budget_days = 30;
-    }
+    const escapedSymbol = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const amountRegex = new RegExp(`(?:${escapedSymbol})?(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)`);
+    const amountMatch = textWithoutDuration.match(amountRegex);
+    const rawAmt = amountMatch ? amountMatch[1].replace(/,/g, '') : '1000';
+    const budget_amount = parseFloat(rawAmt) || 1000;
 
     return { budget_amount, budget_days, is_add_operation };
 }

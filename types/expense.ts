@@ -17,6 +17,7 @@ export interface Expense {
     historicalConvertedAmount?: number;
     items?: Array<{ name: string; qty: number; total: number; category?: ExpenseCategory }>;
     groupId?: string;
+    source?: 'manual' | 'ocr' | 'bank_statement' | 'auto_upi';
 }
 
 export type ExpenseCategory =
@@ -53,7 +54,10 @@ export interface ParsedExpense {
     historicalConvertedAmount?: number;
     items?: Array<{ name: string; qty: number; total: number; category?: ExpenseCategory }>;
     groupId?: string;
+    source?: 'manual' | 'ocr' | 'bank_statement' | 'auto_upi';
 }
+
+export type DashboardMode = 'budget' | 'income';
 
 export interface Budget {
     id: string;
@@ -62,6 +66,7 @@ export interface Budget {
     startDate: string;
     endDate: string;
     createdAt: string;
+    autoRenew?: boolean;
 }
 
 export interface ParsedBudget {

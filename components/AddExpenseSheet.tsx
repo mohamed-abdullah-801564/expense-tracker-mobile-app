@@ -125,7 +125,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             const pickerResult = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
                 allowsEditing: true,
-                quality: 0.8,
+                quality: 0.5,
                 base64: true,
             });
 
@@ -169,7 +169,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             const pickerResult = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsEditing: true,
-                quality: 0.8,
+                quality: 0.5,
                 base64: true,
             });
 
@@ -398,6 +398,19 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     console.error('Split parser failed:', e);
                 }
 
+                // If regex parser did not detect split, check if Gemini AI extracted shared amount
+                if (!splitData && parsed.shared_amount && parsed.shared_amount > 0 && parsed.shared_amount < parsed.amount) {
+                    const friendName = parsed.paid_to || 'Friend';
+                    splitData = {
+                        amount: parsed.amount,
+                        description: parsed.description,
+                        category: parsed.category,
+                        splitCount: 2,
+                        amountPerPerson: parsed.shared_amount,
+                        friendNames: [friendName],
+                    };
+                }
+
                 let userAmount = parsed.amount;
 
                 if (splitData) {
@@ -447,6 +460,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                 }
 
                 addExpense({
+                    id: expenseId,
                     ...parsed,
                     amount: userAmount, 
                     date: expenseDate,
