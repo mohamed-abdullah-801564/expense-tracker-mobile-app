@@ -11,12 +11,14 @@ import { NotificationProvider } from '@/hooks/notification-store';
 import { ExpenseProvider } from '@/hooks/expense-store';
 import { SplitExpenseProvider } from '@/hooks/split-expense-store';
 import { FirstTimeProvider, useFirstTime } from '@/hooks/first-time-store';
+import { SubscriptionProvider, useSubscription } from '@/hooks/subscription-store';
 import { useNotifications } from '@/hooks/notification-store';
 import { View, ActivityIndicator, Animated, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { useRef, useEffect, useState } from 'react';
 import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
 import FeedbackModal from '@/components/FeedbackModal';
+import PaywallModal from '@/components/PaywallModal';
 import { useExpenses } from '@/hooks/expense-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
@@ -24,11 +26,19 @@ import CurrencyPicker from '@/components/CurrencyPicker';
 
 function GlobalModals() {
   const { isFeedbackModalVisible, setFeedbackModalVisible } = useExpenses();
+  const { paywallVisible, closePaywall, paywallReason } = useSubscription();
   return (
-    <FeedbackModal 
-      visible={isFeedbackModalVisible} 
-      onClose={() => setFeedbackModalVisible(false)} 
-    />
+    <>
+      <FeedbackModal 
+        visible={isFeedbackModalVisible} 
+        onClose={() => setFeedbackModalVisible(false)} 
+      />
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={closePaywall}
+        reason={paywallReason}
+      />
+    </>
   );
 }
 
@@ -171,20 +181,35 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might cause this to error */
 });
 
+function ThemedNavigationContainer() {
+  const { isDarkMode } = useTheme();
+  return (
+    <NavigationThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
+      <SubscriptionProvider>
+        <ExpenseProvider>
+          <NotificationProvider>
+            <SplitExpenseProvider>
+              <FirstTimeProvider>
+                <AppContent />
+              </FirstTimeProvider>
+            </SplitExpenseProvider>
+          </NotificationProvider>
+        </ExpenseProvider>
+      </SubscriptionProvider>
+    </NavigationThemeProvider>
+  );
+}
+
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
     async function prepare() {
       try {
         // Pre-load fonts, make any API calls you need to do here
-        // For now, we just simulate a small delay or wait for context to be ready
-        // In a real app, you might use useFonts here.
       } catch (e) {
         console.warn(e);
       } finally {
-        // Tell the application to render
         setAppIsReady(true);
       }
     }
@@ -194,7 +219,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (appIsReady) {
-      // This tells the splash screen to hide immediately! If we need a delay, we could do it here.
       SplashScreen.hideAsync();
     }
   }, [appIsReady]);
@@ -205,19 +229,9 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AppThemeProvider>
-          <ExpenseProvider>
-            <NotificationProvider>
-              <SplitExpenseProvider>
-                <FirstTimeProvider>
-                  <AppContent />
-                </FirstTimeProvider>
-              </SplitExpenseProvider>
-            </NotificationProvider>
-          </ExpenseProvider>
-        </AppThemeProvider>
-      </NavigationThemeProvider>
+      <AppThemeProvider>
+        <ThemedNavigationContainer />
+      </AppThemeProvider>
     </QueryClientProvider>
   );
 }

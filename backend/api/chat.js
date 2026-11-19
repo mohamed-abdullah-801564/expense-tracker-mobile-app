@@ -114,9 +114,16 @@ export default async function handler(req, res) {
       contents = prompt;
     }
 
-    // List of models to try in order of preference
-    const primaryModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-    const fallbackModels = [primaryModel, 'gemini-1.5-flash'].filter((m, i, self) => self.indexOf(m) === i);
+    // List of models to try in order of preference (modern Google AI Studio models with free tier)
+    const envModel = process.env.GEMINI_MODEL;
+    // Discard any deprecated 1.5 models that return 404 in v1beta
+    const validEnvModel = (envModel && !envModel.includes('1.5')) ? envModel : null;
+    const fallbackModels = [
+      validEnvModel,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite'
+    ].filter(Boolean).filter((m, i, self) => self.indexOf(m) === i);
 
     let result = null;
     let lastError = null;

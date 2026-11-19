@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useExpenses } from '@/hooks/expense-store';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
+import { useSubscription } from '@/hooks/subscription-store';
 import { parseExpenseWithAI, validateAmount, getFallbackRate } from '@/utils/expense-parser';
 import { parseSplitExpense, createSplitExpenses, parseDebt, ParsedSplitWithNames } from '@/utils/split-expense-parser';
 import { SplitExpense } from '@/types/expense';
@@ -51,6 +52,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
     const { addExpense } = useExpenses();
     const { addSplitExpenses } = useSplitExpenses();
     const { colors, homeCurrencyCode, currencyCountryName } = useTheme();
+    const { canUseFeature, openPaywall, recordAiScan, isPro } = useSubscription();
 
     const placeholders = [
         "Sent 500 to family for rent",
@@ -84,6 +86,7 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
 
             // Increment local daily scan storage count upon success
             await incrementDailyScanCount();
+            await recordAiScan();
 
             // Pre-fill states for "Review First" workflow
             setScannedData({
@@ -103,14 +106,18 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
     };
 
     const handleCameraScan = async () => {
-        // 1. Check daily rate limiting guard
-        const limitCheck = await checkDailyScanLimit();
-        if (!limitCheck.allowed) {
-            Alert.alert(
-                "Limit Reached",
-                "Daily scan limit reached (3/3). Please type your expense manually or try again tomorrow."
-            );
+        // 1. Check subscription / daily rate limiting guard
+        if (!canUseFeature('ai_scan')) {
+            openPaywall('ocr_limit');
             return;
+        }
+
+        if (!isPro) {
+            const limitCheck = await checkDailyScanLimit();
+            if (!limitCheck.allowed) {
+                openPaywall('ocr_limit');
+                return;
+            }
         }
 
         // 2. Request camera permissions
@@ -147,14 +154,18 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
     };
 
     const handleGalleryScan = async () => {
-        // 1. Check daily rate limiting guard
-        const limitCheck = await checkDailyScanLimit();
-        if (!limitCheck.allowed) {
-            Alert.alert(
-                "Limit Reached",
-                "Daily scan limit reached (3/3). Please type your expense manually or try again tomorrow."
-            );
+        // 1. Check subscription / daily rate limiting guard
+        if (!canUseFeature('ai_scan')) {
+            openPaywall('ocr_limit');
             return;
+        }
+
+        if (!isPro) {
+            const limitCheck = await checkDailyScanLimit();
+            if (!limitCheck.allowed) {
+                openPaywall('ocr_limit');
+                return;
+            }
         }
 
         // 2. Request media library permissions

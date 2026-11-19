@@ -67,6 +67,18 @@ export interface Budget {
     endDate: string;
     createdAt: string;
     autoRenew?: boolean;
+    rolloverLeftover?: boolean;
+    baseAmount?: number;
+}
+
+export interface SubscriptionState {
+    isPro: boolean;
+    plan: 'none' | 'monthly' | 'yearly';
+    trialActive: boolean;
+    trialEndsAt: string | null;
+    csvImportsUsed: number;
+    aiScansDate: string;
+    aiScansUsedToday: number;
 }
 
 export interface ParsedBudget {

@@ -24,12 +24,16 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
     const [autoRenew, setAutoRenew] = useState<boolean>(
         budgetProgress?.budget?.autoRenew ?? (isIncome ? true : false)
     );
+    const [rolloverLeftover, setRolloverLeftover] = useState<boolean>(
+        budgetProgress?.budget?.rolloverLeftover ?? (isIncome ? false : true)
+    );
 
     useEffect(() => {
         if (isVisible) {
             setAutoRenew(budgetProgress?.budget?.autoRenew ?? (isIncome ? true : false));
+            setRolloverLeftover(budgetProgress?.budget?.rolloverLeftover ?? (isIncome ? false : true));
         }
-    }, [isVisible, budgetProgress?.budget?.autoRenew, isIncome]);
+    }, [isVisible, budgetProgress?.budget?.autoRenew, budgetProgress?.budget?.rolloverLeftover, isIncome]);
 
     const relevantExpensesTotal = React.useMemo(() => {
         if (budgetProgress) return budgetProgress.totalSpent;
@@ -81,7 +85,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
 
             if (isAddOperation) {
                 // If adding to existing budget, skip deduction choice and just add
-                setBudgetData(baseAmount, daysToPass, 'add', false, autoRenew);
+                setBudgetData(baseAmount, daysToPass, 'add', false, autoRenew, rolloverLeftover);
                 setInput('');
                 onClose();
                 Alert.alert(
@@ -93,7 +97,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
             } else if (relevantExpensesTotal > 0) {
                 setShowDeductionChoice(true);
             } else {
-                setBudgetData(baseAmount, daysToPass, 'replace', false, autoRenew);
+                setBudgetData(baseAmount, daysToPass, 'replace', false, autoRenew, rolloverLeftover);
                 setInput('');
                 onClose();
                 Alert.alert('Success', isIncome ? 'Income set successfully!' : 'Budget set successfully!');
@@ -108,7 +112,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
 
     const handleDeductionChoice = (deductExpenses: boolean) => {
         if (pendingBudget) {
-            setBudgetData(pendingBudget.amount, pendingBudget.days, 'replace', deductExpenses, autoRenew);
+            setBudgetData(pendingBudget.amount, pendingBudget.days, 'replace', deductExpenses, autoRenew, rolloverLeftover);
             setInput('');
             setPendingBudget(null);
             setShowDeductionChoice(false);
@@ -229,7 +233,7 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                                 <Text style={[styles.autoRenewTitle, { color: colors.text }]}>Auto-renew every cycle</Text>
                                 <Text style={[styles.autoRenewSubtitle, { color: colors.textSecondary }]}>
                                     {isIncome
-                                        ? 'Automatically roll over monthly salary and cycle'
+                                        ? 'Automatically restart new cycle with monthly income'
                                         : 'Automatically restart a fresh budget when this period ends'}
                                 </Text>
                             </View>
@@ -240,6 +244,28 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                                 thumbColor={colors.surface}
                             />
                         </View>
+
+                        {/* Rollover Leftover Balance Toggle */}
+                        {autoRenew && (
+                            <View style={[styles.autoRenewRow, { borderColor: colors.border, marginTop: 10 }]}>
+                                <View style={styles.autoRenewLeft}>
+                                    <Text style={[styles.autoRenewTitle, { color: colors.text }]}>
+                                        {isIncome ? 'Carry forward unused savings' : 'Carry forward leftover balance'}
+                                    </Text>
+                                    <Text style={[styles.autoRenewSubtitle, { color: colors.textSecondary }]}>
+                                        {isIncome
+                                            ? 'Add leftover savings from this cycle to next month’s available cash'
+                                            : 'Add unspent allowance from this cycle to next cycle’s budget'}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={rolloverLeftover}
+                                    onValueChange={setRolloverLeftover}
+                                    trackColor={{ false: colors.border, true: colors.primary }}
+                                    thumbColor={colors.surface}
+                                />
+                            </View>
+                        )}
 
                         <TouchableOpacity
                             style={[styles.button, { backgroundColor: colors.primary }, isLoading && styles.buttonDisabled]}

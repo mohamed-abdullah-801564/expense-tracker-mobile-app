@@ -11,6 +11,7 @@ import { AddExpenseSheet } from '@/components/AddExpenseSheet';
 import BudgetCard from '@/components/BudgetCard';
 import SetBudgetSheet from '@/components/SetBudgetSheet';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
+import { NumberTicker } from '@/components/ui/number-ticker';
 
 export default function ExpensesScreen() {
   const { expenses, stats, isLoading } = useExpenses();
@@ -51,7 +52,13 @@ export default function ExpensesScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.totalLabel}>Total Expenses</Text>
-          <Text style={styles.totalAmount}>{colors.currencySymbol}{convertedTotal.toFixed(2)}</Text>
+          <NumberTicker
+            tickerId="home_total_expenses"
+            value={convertedTotal}
+            prefix={colors.currencySymbol}
+            decimalPlaces={2}
+            style={styles.totalAmount}
+          />
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity

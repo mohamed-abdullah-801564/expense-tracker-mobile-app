@@ -346,7 +346,8 @@ function useCreateExpenseContext() {
         budgetDays: number,
         type: 'add' | 'replace' = 'replace',
         deductExistingExpenses: boolean = false,
-        autoRenew: boolean = false
+        autoRenew: boolean = false,
+        rolloverLeftover: boolean = false
     ) => {
         let finalAmount = budgetAmount;
         let description = '';
@@ -357,12 +358,14 @@ function useCreateExpenseContext() {
         const isIncome = dashboardMode === 'income';
         const targetLabel = isIncome ? 'income' : 'budget';
 
+        let baseAmount = budgetAmount;
         if (type === 'add' && budget) {
             // Keep existing dates
             startDate = new Date(budget.startDate);
             endDate = new Date(budget.endDate);
 
             finalAmount = budget.amount + budgetAmount;
+            baseAmount = (budget.baseAmount ?? budget.amount) + budgetAmount;
             description = `Added ${colors.currencySymbol}${budgetAmount} to existing ${targetLabel} of ${colors.currencySymbol}${budget.amount}`;
         } else {
             description = `Set new ${targetLabel} of ${colors.currencySymbol}${budgetAmount} for ${budgetDays} days`;
@@ -387,11 +390,13 @@ function useCreateExpenseContext() {
         const newBudget: Budget = {
             id: Date.now().toString(),
             amount: finalAmount,
+            baseAmount: baseAmount,
             days: type === 'add' && budget ? budget.days : budgetDays,
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
             createdAt: new Date().toISOString(),
             autoRenew: type === 'add' && budget ? (budget.autoRenew ?? autoRenew) : autoRenew,
+            rolloverLeftover: type === 'add' && budget ? (budget.rolloverLeftover ?? rolloverLeftover) : rolloverLeftover,
         };
 
         const transaction: BudgetTransaction = {
@@ -431,6 +436,9 @@ function useCreateExpenseContext() {
     const importAllData = useCallback(async (data: any) => {
         const success = await StorageUtils.importData(data);
         if (success) {
+            if (data.expenses) setExpenses(data.expenses);
+            if (data.budget !== undefined) setBudget(data.budget);
+            if (data.budgetHistory) setBudgetHistory(data.budgetHistory);
             // Refresh all queries to show imported data
             queryClient.setQueryData(['expenses'], data.expenses || []);
             queryClient.setQueryData(['budget'], data.budget || null);
@@ -525,9 +533,31 @@ function useCreateExpenseContext() {
             const newEnd = new Date();
             newEnd.setDate(newStart.getDate() + (budget.days || 30));
 
+            const base = budget.baseAmount ?? budget.amount;
+            let newAmount = base;
+            let rolloverNote = '';
+
+            if (budget.rolloverLeftover) {
+                const prevStart = new Date(budget.startDate);
+                const prevEnd = new Date(budget.endDate);
+                const prevExpenses = expenses.filter(e => {
+                    if (e.isDeleted) return false;
+                    const d = new Date(e.date);
+                    return d >= prevStart && d <= prevEnd;
+                });
+                const totalPrevSpent = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const leftover = budget.amount - totalPrevSpent;
+                if (leftover > 0) {
+                    newAmount = base + leftover;
+                    rolloverNote = ` (+${colors.currencySymbol}${leftover} leftover rolled over)`;
+                }
+            }
+
             const renewedBudget: Budget = {
                 ...budget,
                 id: Date.now().toString(),
+                amount: newAmount,
+                baseAmount: base,
                 startDate: newStart.toISOString(),
                 endDate: newEnd.toISOString(),
                 createdAt: new Date().toISOString(),
@@ -537,11 +567,11 @@ function useCreateExpenseContext() {
             const transaction: BudgetTransaction = {
                 id: Date.now().toString(),
                 type: 'replace',
-                amount: budget.amount,
+                amount: newAmount,
                 previousAmount: budget.amount,
                 deductExistingExpenses: false,
                 createdAt: new Date().toISOString(),
-                description: `Auto-renewed ${modeLabel} of ${colors.currencySymbol}${budget.amount}`,
+                description: `Auto-renewed ${modeLabel} of ${colors.currencySymbol}${base}${rolloverNote}`,
             };
 
             const updatedHistory = [transaction, ...budgetHistory];
@@ -550,7 +580,7 @@ function useCreateExpenseContext() {
             saveBudget(renewedBudget);
             saveBudgetHistory(updatedHistory);
         }
-    }, [budget, budgetHistory, dashboardMode, colors.currencySymbol, saveBudget, saveBudgetHistory]);
+    }, [budget, budgetHistory, dashboardMode, expenses, colors.currencySymbol, saveBudget, saveBudgetHistory]);
 
     // Filter active expenses (non-deleted)
     const activeExpenses = useMemo(() => {

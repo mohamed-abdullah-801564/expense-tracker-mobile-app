@@ -110,8 +110,8 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
 
         if (!response.ok) {
             const errorText = await response.text().catch(() => '');
-            console.error(`Proxy response failed with status ${response.status}:`, errorText);
-            throw new Error(`Failed to parse expense: ${response.status} ${errorText}`);
+            console.warn(`[AI Parser] Cloud AI unavailable (${response.status}), seamlessly using on-device parser:`, errorText);
+            return fallbackParser(input, currencySymbol, homeCurrencyCode);
         }
 
         const data = await response.json();
@@ -171,7 +171,7 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
         if (error.name === 'AbortError') {
             console.log('Expense parsing timed out, falling back to basic parser');
         } else {
-            console.error('Error parsing expense:', error);
+            console.warn('[AI Parser] Notice: used on-device parser fallback:', error?.message || error);
         }
         return fallbackParser(input, currencySymbol, homeCurrencyCode);
     } finally {

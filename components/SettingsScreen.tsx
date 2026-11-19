@@ -10,6 +10,7 @@ import {
     TextInput,
     Alert,
     Platform,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -31,13 +32,18 @@ import {
     Landmark,
     Sliders,
     Smartphone,
-    Zap
+    Zap,
+    Sparkles,
+    CloudUpload,
+    CloudDownload,
+    Crown,
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useTheme } from '@/hooks/theme-store';
 import { useNotifications } from '@/hooks/notification-store';
 import { useExpenses } from '@/hooks/expense-store';
 import { useAutoTracking } from '@/hooks/use-auto-tracking';
+import { useSubscription } from '@/hooks/subscription-store';
 import { ExpenseCategory } from '@/types/expense';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
 import CurrencyPicker from './CurrencyPicker';
@@ -69,6 +75,7 @@ export default function SettingsScreen() {
         budget,
         budgetHistory,
         exportAllData,
+        importAllData,
         createBackup,
         setFeedbackModalVisible,
         addExpense,
@@ -80,10 +87,23 @@ export default function SettingsScreen() {
         setAutoTrackingEnabled,
         processNotification
     } = useAutoTracking();
+    const {
+        isPro,
+        plan,
+        trialActive,
+        trialDaysRemaining,
+        csvImportsUsed,
+        maxFreeCsvImports,
+        canUseFeature,
+        recordCsvImport,
+        openPaywall,
+        cancelPro,
+    } = useSubscription();
 
     const [showAddBill, setShowAddBill] = useState<boolean>(false);
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [isCreatingBackup, setIsCreatingBackup] = useState<boolean>(false);
+    const [isRestoringBackup, setIsRestoringBackup] = useState<boolean>(false);
     const [showHowItWorks, setShowHowItWorks] = useState<boolean>(false);
     const [csvTransactions, setCsvTransactions] = useState<ParsedBankTransaction[]>([]);
     const [showCsvModal, setShowCsvModal] = useState<boolean>(false);
@@ -96,7 +116,85 @@ export default function SettingsScreen() {
         frequency: 'monthly' as 'monthly' | 'weekly' | 'yearly',
     });
 
+    const readFileContent = async (asset: DocumentPicker.DocumentPickerAsset): Promise<string> => {
+        // Strategy 1: If asset.file has text() method (Web / Blob File API)
+        if (asset.file && typeof (asset.file as any).text === 'function') {
+            try {
+                return await (asset.file as any).text();
+            } catch (e) {
+                console.log('asset.file.text() failed, trying other methods:', e);
+            }
+        }
+
+        const uri = asset.uri;
+
+        // Strategy 2: Global fetch (React Native handles file:// and content:// URIs directly via OkHttp / ContentResolver)
+        try {
+            const response = await fetch(uri);
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+                return text;
+            }
+        } catch (fetchErr) {
+            console.log('fetch file reader failed, falling back to FileSystem:', fetchErr);
+        }
+
+        // Strategy 3: FileSystem.readAsStringAsync (Legacy Expo FileSystem)
+        try {
+            const text = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.UTF8,
+            });
+            if (text && text.trim().length > 0) {
+                return text;
+            }
+        } catch (fsErr) {
+            console.warn('FileSystem.readAsStringAsync failed:', fsErr);
+            throw fsErr;
+        }
+
+        throw new Error('File content is empty or unreadable');
+    };
+
+    const handleManageSubscription = () => {
+        Alert.alert(
+            'Expense Tracker Pro Active 👑',
+            `Plan: ${plan === 'yearly' ? 'Annual Pro (Billed Yearly)' : plan === 'monthly' ? 'Monthly Pro (Billed Monthly)' : 'Lifetime Pro'}\n\nStatus: Active (Development / Test Sandbox)\n\nAll Pro Features Unlocked:\n• Automatic UPI Payment Detection\n• Unlimited Gemini AI Receipt Scans\n• Unlimited Bank Statement CSV Imports\n• Google Drive Auto-Sync & Cloud Backup\n\nNote: In development test mode, subscriptions are simulated on-device. Live subscriptions appear in Google Play after publishing to Play Store.`,
+            [
+                {
+                    text: 'Switch Plan',
+                    onPress: () => openPaywall('settings'),
+                },
+                {
+                    text: 'Reset Test Pro',
+                    style: 'destructive',
+                    onPress: () => {
+                        Alert.alert(
+                            'Reset Subscription',
+                            'Are you sure you want to reset back to the free tier for testing?',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                    text: 'Reset to Free',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                        await cancelPro();
+                                        Alert.alert('Reset Complete', 'You are now back on the free plan.');
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                },
+                { text: 'Done', style: 'cancel' },
+            ]
+        );
+    };
+
     const handleImportCsv = async () => {
+        if (!canUseFeature('csv_import')) {
+            openPaywall('csv_limit');
+            return;
+        }
         setIsImportingCsv(true);
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -109,8 +207,8 @@ export default function SettingsScreen() {
                 return;
             }
 
-            const fileUri = result.assets[0].uri;
-            const csvContent = await FileSystem.readAsStringAsync(fileUri);
+            const asset = result.assets[0];
+            const csvContent = await readFileContent(asset);
 
             const parsed = parseBankStatementCsv(csvContent);
             if (parsed.length === 0) {
@@ -147,7 +245,7 @@ export default function SettingsScreen() {
         const duplicates = selectedItems.filter(isDuplicate);
         const nonDuplicates = selectedItems.filter(item => !isDuplicate(item));
 
-        const executeImport = (itemsToImport: ParsedBankTransaction[]) => {
+        const executeImport = async (itemsToImport: ParsedBankTransaction[]) => {
             if (itemsToImport.length === 0) {
                 setShowCsvModal(false);
                 Alert.alert('No New Expenses', 'All selected items were duplicates and were skipped.');
@@ -163,6 +261,7 @@ export default function SettingsScreen() {
             }));
 
             addExpense(expensesToAdd);
+            await recordCsvImport();
             setShowCsvModal(false);
 
             Alert.alert(
@@ -314,17 +413,104 @@ export default function SettingsScreen() {
     const handleCreateBackup = async () => {
         setIsCreatingBackup(true);
         try {
-            await createBackup();
-            Alert.alert(
-                'Backup Created',
-                'A backup of your data has been created successfully. This backup will be used for recovery if needed.',
-                [{ text: 'OK' }]
-            );
+            const data = await exportAllData();
+            if (!data) {
+                Alert.alert('Backup Failed', 'No data available to backup.');
+                return;
+            }
+
+            const jsonString = JSON.stringify(data, null, 2);
+            const dateStr = new Date().toISOString().split('T')[0];
+            const fileName = `expense_tracker_backup_${dateStr}.json`;
+
+            if (Platform.OS === 'web') {
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                Alert.alert('Backup Created', 'Backup file downloaded successfully.');
+                return;
+            }
+
+            const fileUri = FileSystem.documentDirectory + fileName;
+            await FileSystem.writeAsStringAsync(fileUri, jsonString);
+
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(fileUri, {
+                    mimeType: 'application/json',
+                    dialogTitle: 'Save Backup to Google Drive / Files',
+                    UTI: 'public.json',
+                });
+            } else {
+                Alert.alert('Backup Created', `Saved to ${fileName}`);
+            }
         } catch (error) {
             console.error('Backup error:', error);
             Alert.alert('Backup Failed', 'Failed to create backup. Please try again.');
         } finally {
             setIsCreatingBackup(false);
+        }
+    };
+
+    const handleRestoreBackup = async () => {
+        setIsRestoringBackup(true);
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['application/json', 'text/json', 'text/plain', '*/*'],
+                copyToCacheDirectory: true,
+            });
+
+            if (result.canceled || !result.assets || result.assets.length === 0) {
+                return;
+            }
+
+            const asset = result.assets[0];
+            const content = await readFileContent(asset);
+            const parsed = JSON.parse(content);
+
+            if (!parsed || (!parsed.expenses && !parsed.budget)) {
+                Alert.alert(
+                    'Invalid Backup File',
+                    'The selected file does not appear to be a valid Expense Tracker backup.'
+                );
+                return;
+            }
+
+            const expenseCount = Array.isArray(parsed.expenses) ? parsed.expenses.length : 0;
+            const hasBudget = !!parsed.budget;
+
+            Alert.alert(
+                'Confirm Restore',
+                `Found ${expenseCount} expense(s)${hasBudget ? ' and budget plan' : ''} in this backup.\n\nRestoring will replace current expenses with this backup. Do you want to proceed?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Restore Now',
+                        style: 'destructive',
+                        onPress: async () => {
+                            const success = await importAllData(parsed);
+                            if (success) {
+                                Alert.alert(
+                                    'Restore Successful 🎉',
+                                    `Successfully restored ${expenseCount} expenses and your financial history!`
+                                );
+                            } else {
+                                Alert.alert('Restore Failed', 'Could not restore backup data.');
+                            }
+                        }
+                    }
+                ]
+            );
+        } catch (error: any) {
+            console.error('Restore error:', error);
+            Alert.alert('Restore Failed', 'Failed to read or parse the selected backup file.');
+        } finally {
+            setIsRestoringBackup(false);
         }
     };
 
@@ -352,6 +538,125 @@ export default function SettingsScreen() {
                             <Text style={styles.howItWorksText}>How It Works - App Guide</Text>
                         </View>
                     </TouchableOpacity>
+                </View>
+
+                {/* Luxury VIP Pro Subscription Card */}
+                <View style={[styles.section, { padding: 0, overflow: 'hidden', backgroundColor: 'transparent' }]}>
+                    {isPro ? (
+                        <TouchableOpacity
+                            style={styles.luxuryProCard}
+                            onPress={handleManageSubscription}
+                            activeOpacity={0.88}
+                        >
+                            {/* Top Row: Crown Badge & Status */}
+                            <View style={styles.luxuryHeaderRow}>
+                                <View style={styles.luxuryBadge}>
+                                    <Crown size={15} color="#F59E0B" />
+                                    <Text style={styles.luxuryBadgeText}>EXPENSE TRACKER PRO</Text>
+                                </View>
+                                <View style={styles.goldStatusPill}>
+                                    <Text style={styles.goldStatusPillText}>
+                                        {plan === 'yearly' ? '👑 ANNUAL VIP' : plan === 'monthly' ? '👑 MONTHLY VIP' : '👑 ACTIVE'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Middle Title & Subtitle */}
+                            <Text style={styles.luxuryTitle}>All Premium Features Unlocked</Text>
+                            <Text style={styles.luxurySubtitle}>
+                                100% on-device privacy • Unlimited AI & auto-tracking
+                            </Text>
+
+                            {/* Feature Chips */}
+                            <View style={styles.chipRow}>
+                                <View style={styles.chip}>
+                                    <Text style={styles.chipText}>⚡ Auto-UPI</Text>
+                                </View>
+                                <View style={styles.chip}>
+                                    <Text style={styles.chipText}>📸 Gemini OCR</Text>
+                                </View>
+                                <View style={styles.chip}>
+                                    <Text style={styles.chipText}>☁️ Drive Sync</Text>
+                                </View>
+                            </View>
+
+                            {/* Action Bar */}
+                            <View style={styles.luxuryActionBar}>
+                                <Text style={styles.luxuryActionText}>Manage Subscription</Text>
+                                <Text style={styles.luxuryArrow}>›</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ) : trialActive ? (
+                        <TouchableOpacity
+                            style={[styles.luxuryProCard, { borderColor: colors.primary }]}
+                            onPress={() => openPaywall('settings')}
+                            activeOpacity={0.88}
+                        >
+                            <View style={styles.luxuryHeaderRow}>
+                                <View style={[styles.luxuryBadge, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '18' }]}>
+                                    <Sparkles size={15} color={colors.primary} />
+                                    <Text style={[styles.luxuryBadgeText, { color: colors.primary }]}>PRO TRIAL ACTIVE</Text>
+                                </View>
+                                <View style={[styles.goldStatusPill, { backgroundColor: colors.primary }]}>
+                                    <Text style={[styles.goldStatusPillText, { color: '#FFFFFF' }]}>
+                                        {trialDaysRemaining} DAYS LEFT
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.luxuryTitle}>Enjoying Pro Features?</Text>
+                            <Text style={styles.luxurySubtitle}>
+                                Lock in 33% annual savings before your trial ends.
+                            </Text>
+
+                            <View style={styles.chipRow}>
+                                <View style={styles.chip}><Text style={styles.chipText}>⚡ Auto-UPI</Text></View>
+                                <View style={styles.chip}><Text style={styles.chipText}>📸 Gemini OCR</Text></View>
+                                <View style={styles.chip}><Text style={styles.chipText}>☁️ Drive Sync</Text></View>
+                            </View>
+
+                            <View style={styles.luxuryActionBar}>
+                                <Text style={[styles.luxuryActionText, { color: colors.primary }]}>View Plans & Save 33%</Text>
+                                <Text style={[styles.luxuryArrow, { color: colors.primary }]}>›</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={styles.luxuryProCard}
+                            onPress={() => openPaywall('settings')}
+                            activeOpacity={0.88}
+                        >
+                            <View style={styles.luxuryHeaderRow}>
+                                <View style={styles.luxuryBadge}>
+                                    <Crown size={15} color="#F59E0B" />
+                                    <Text style={styles.luxuryBadgeText}>EXPENSE TRACKER PRO</Text>
+                                </View>
+                                <View style={styles.goldStatusPill}>
+                                    <Text style={styles.goldStatusPillText}>SAVE 33%</Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.luxuryTitle}>Automate Your Finances</Text>
+                            <Text style={styles.luxurySubtitle}>
+                                Auto-track UPI payments, unlimited Gemini AI receipt scans, bank imports & cloud backup.
+                            </Text>
+
+                            <View style={styles.chipRow}>
+                                <View style={styles.chip}><Text style={styles.chipText}>⚡ Auto-UPI</Text></View>
+                                <View style={styles.chip}><Text style={styles.chipText}>📸 Gemini OCR</Text></View>
+                                <View style={styles.chip}><Text style={styles.chipText}>📄 Bank CSVs</Text></View>
+                                <View style={styles.chip}><Text style={styles.chipText}>☁️ Cloud Sync</Text></View>
+                            </View>
+
+                            <View style={styles.luxuryCtaRow}>
+                                <View style={styles.luxuryCtaButton}>
+                                    <Sparkles size={14} color="#FFFFFF" />
+                                    <Text style={styles.luxuryCtaButtonText}>Upgrade to Pro • View Plans</Text>
+                                    <Text style={[styles.luxuryArrow, { color: '#FFFFFF', fontSize: 16 }]}>›</Text>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.section}>
@@ -501,21 +806,57 @@ export default function SettingsScreen() {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Auto-Tracking (UPI & Banks)</Text>
+                    <View style={[styles.sectionHeader, { alignItems: 'center', marginBottom: 12 }]}>
+                        <Text style={[styles.sectionTitle, { marginBottom: 0, flex: 1, marginRight: 8 }]} numberOfLines={1}>
+                            Auto-Tracking (UPI)
+                        </Text>
+                        {!isPro && !trialActive && (
+                            <TouchableOpacity
+                                style={[styles.proTrialBadge, { backgroundColor: colors.primary + '18' }]}
+                                onPress={() => openPaywall('auto_upi')}
+                                activeOpacity={0.7}
+                            >
+                                <Sparkles size={12} color={colors.primary} />
+                                <Text style={[styles.proTrialBadgeText, { color: colors.primary }]}>
+                                    7-DAY TRIAL
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        {trialActive && (
+                            <View style={[styles.proTrialBadge, { backgroundColor: colors.primary + '18' }]}>
+                                <Text style={[styles.proTrialBadgeText, { color: colors.primary }]}>
+                                    TRIAL: {trialDaysRemaining}D
+                                </Text>
+                            </View>
+                        )}
+                        {isPro && (
+                            <View style={[styles.proTrialBadge, { backgroundColor: '#10B98118' }]}>
+                                <Text style={[styles.proTrialBadgeText, { color: '#10B981' }]}>
+                                    PRO
+                                </Text>
+                            </View>
+                        )}
+                    </View>
 
                     <View style={[styles.settingItem, { borderBottomWidth: 0, paddingBottom: 6 }]}>
-                        <View style={styles.settingLeft}>
+                        <View style={[styles.settingLeft, { flex: 1, paddingRight: 12 }]}>
                             <Smartphone size={20} color={colors.text} />
-                            <View style={{ flex: 1, paddingRight: 8 }}>
+                            <View style={{ flex: 1 }}>
                                 <Text style={styles.settingLabel}>Track UPI & Bank Alerts</Text>
-                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2, lineHeight: 18 }}>
                                     Auto-records expenses from Google Pay, PhonePe, Paytm, CRED and Banks on-device.
                                 </Text>
                             </View>
                         </View>
                         <Switch
                             value={isAutoTrackingEnabled}
-                            onValueChange={setAutoTrackingEnabled}
+                            onValueChange={(val) => {
+                                if (val && !canUseFeature('auto_upi')) {
+                                    openPaywall('auto_upi');
+                                    return;
+                                }
+                                setAutoTrackingEnabled(val);
+                            }}
                             trackColor={{ false: colors.border, true: colors.primary }}
                             thumbColor={colors.surface}
                         />
@@ -643,9 +984,16 @@ export default function SettingsScreen() {
                     >
                         <View style={styles.settingLeft}>
                             <Landmark size={20} color={colors.primary} />
-                            <Text style={styles.dataButtonText}>
-                                {isImportingCsv ? 'Reading CSV...' : 'Import Bank Statement (.CSV)'}
-                            </Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.dataButtonText}>
+                                    {isImportingCsv ? 'Reading CSV...' : 'Import Bank Statement (.CSV)'}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                                    {isPro
+                                        ? 'Unlimited imports (Pro Active)'
+                                        : `${Math.max(0, maxFreeCsvImports - csvImportsUsed)} of ${maxFreeCsvImports} free imports left`}
+                                </Text>
+                            </View>
                         </View>
                     </TouchableOpacity>
 
@@ -668,10 +1016,33 @@ export default function SettingsScreen() {
                         disabled={isCreatingBackup}
                     >
                         <View style={styles.settingLeft}>
-                            <Shield size={20} color={colors.success} />
-                            <Text style={styles.dataButtonText}>
-                                {isCreatingBackup ? 'Creating Backup...' : 'Create Backup'}
-                            </Text>
+                            <CloudUpload size={20} color={colors.primary} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.dataButtonText}>
+                                    {isCreatingBackup ? 'Creating Backup...' : 'Backup to Google Drive / Files (.JSON)'}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                                    Save complete snapshot of expenses & budget to Drive
+                                </Text>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.dataButton}
+                        onPress={handleRestoreBackup}
+                        disabled={isRestoringBackup}
+                    >
+                        <View style={styles.settingLeft}>
+                            <CloudDownload size={20} color={colors.success} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.dataButtonText}>
+                                    {isRestoringBackup ? 'Selecting Backup...' : 'Restore from Google Drive / Files (.JSON)'}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                                    Recover data from your Google Drive backup file
+                                </Text>
+                            </View>
                         </View>
                     </TouchableOpacity>
 
@@ -688,8 +1059,7 @@ export default function SettingsScreen() {
                     <View style={styles.infoBox}>
                         <Database size={16} color={colors.textSecondary} />
                         <Text style={styles.infoText}>
-                            Your data is automatically saved to device storage and persists across app sessions.
-                            Backups are created automatically when you make changes.
+                            Your financial data stays 100% private on your device. Backup to Google Drive to keep your history safe even if you uninstall the app.
                         </Text>
                     </View>
                 </View>
@@ -842,6 +1212,168 @@ const createStyles = (colors: any) => StyleSheet.create({
         marginVertical: 8,
         borderRadius: 12,
         padding: 16,
+    },
+    proCard: {
+        borderRadius: 12,
+        borderWidth: 1.5,
+        padding: 14,
+        backgroundColor: colors.surface,
+    },
+    proCardLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    proIconBadge: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    proCardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    proCardSubtitle: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    proStatusPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    proUpgradeBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    proTrialBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    proTrialBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    luxuryProCard: {
+        backgroundColor: colors.surface,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#F59E0B',
+        padding: 16,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    luxuryHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    luxuryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F59E0B18',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#F59E0B35',
+    },
+    luxuryBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#F59E0B',
+        letterSpacing: 0.6,
+    },
+    goldStatusPill: {
+        backgroundColor: '#F59E0B20',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    goldStatusPillText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#F59E0B',
+        letterSpacing: 0.4,
+    },
+    luxuryTitle: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: colors.text,
+        letterSpacing: -0.3,
+        marginBottom: 3,
+    },
+    luxurySubtitle: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        lineHeight: 16,
+        marginBottom: 12,
+    },
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 12,
+    },
+    chip: {
+        backgroundColor: colors.background,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    chipText: {
+        fontSize: 11,
+        color: colors.text,
+        fontWeight: '600',
+    },
+    luxuryActionBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+    },
+    luxuryActionText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#F59E0B',
+    },
+    luxuryArrow: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#F59E0B',
+    },
+    luxuryCtaRow: {
+        paddingTop: 4,
+    },
+    luxuryCtaButton: {
+        backgroundColor: '#F59E0B',
+        borderRadius: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    luxuryCtaButtonText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#FFFFFF',
     },
     sectionHeader: {
         flexDirection: 'row',

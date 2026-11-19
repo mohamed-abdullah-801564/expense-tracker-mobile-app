@@ -38,7 +38,7 @@ const MERCHANT_CATEGORY_MAP: Array<{ regex: RegExp; category: ExpenseCategory }>
         category: 'Utilities'
     },
     {
-        regex: /\b(amazon|flipkart|myntra|ajio|meesho|zara|h&m|croma|reliance|dmart|d-mart|blinkit|zepto|instamart|bigbasket|supermarket|mart|store)\b/i,
+        regex: /\b(amazon|flipkart|myntra|ajio|meesho|zara|h&m|croma|reliance|dmart|d-mart|blinkit|zepto|instamart|bigbasket|supermarket|mart|store|trends|zudio|pantaloons|lifestyle|fabindia|max\s*fashion|peter\s*england|westside|raymond|cotton|boutique|dress|clothing|apparel|textiles|garments|tailor|fashion|footwear|bata|decathlon|allen\s*solly|van\s*heusen|shoppers\s*stop|shirt|tshirt|t-shirt|jeans|cloth)\b/i,
         category: 'Shopping'
     },
     {

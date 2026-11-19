@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, TextInput } from 'react-native';
 import { Target, AlertTriangle, CheckCircle, Clock, Plus, X } from 'lucide-react-native';
+import { NumberTicker } from '@/components/ui/number-ticker';
 import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
@@ -127,14 +128,26 @@ export default function BudgetCard({ onSetBudget }: BudgetCardProps) {
 
             {/* Main Content */}
             <View style={styles.mainContent}>
-                <Text style={[styles.remainingAmount, { color: isDeficit ? colors.error : colors.text }]}>
-                    {isDeficit ? '-' : ''}{colors.currencySymbol}{Math.abs(convertedRemaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
+                <NumberTicker
+                    tickerId="budget_remaining"
+                    value={Math.abs(convertedRemaining)}
+                    prefix={`${isDeficit ? '-' : ''}${colors.currencySymbol}`}
+                    decimalPlaces={2}
+                    style={[styles.remainingAmount, { color: isDeficit ? colors.error : colors.text }]}
+                />
 
                 <View style={styles.totalRow}>
-                    <Text style={styles.totalText}>
-                        of {colors.currencySymbol}{convertedTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {isIncome ? 'income' : 'total'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.totalText}>of </Text>
+                        <NumberTicker
+                            tickerId="budget_total"
+                            value={convertedTotalAmount}
+                            prefix={colors.currencySymbol}
+                            decimalPlaces={2}
+                            style={styles.totalText}
+                        />
+                        <Text style={styles.totalText}> {isIncome ? 'income' : 'total'}</Text>
+                    </View>
                     <TouchableOpacity onPress={() => setShowTopUp(true)} style={styles.topUpButton}>
                         <Plus size={14} color="white" />
                     </TouchableOpacity>
