@@ -7,6 +7,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { DeductionChoiceModal } from '@/components/DeductionChoiceModal';
+import { posthog } from '@/utils/posthog';
 
 interface SetBudgetSheetProps {
     isVisible: boolean;
@@ -86,6 +87,13 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
             if (isAddOperation) {
                 // If adding to existing budget, skip deduction choice and just add
                 setBudgetData(baseAmount, daysToPass, 'add', false, autoRenew, rolloverLeftover);
+                posthog?.capture('budget_configured', {
+                    dashboard_mode: dashboardMode,
+                    update_type: 'add',
+                    deduct_existing_expenses: false,
+                    auto_renew: autoRenew,
+                    rollover_leftover: rolloverLeftover,
+                });
                 setInput('');
                 onClose();
                 Alert.alert(
@@ -98,6 +106,13 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
                 setShowDeductionChoice(true);
             } else {
                 setBudgetData(baseAmount, daysToPass, 'replace', false, autoRenew, rolloverLeftover);
+                posthog?.capture('budget_configured', {
+                    dashboard_mode: dashboardMode,
+                    update_type: 'replace',
+                    deduct_existing_expenses: false,
+                    auto_renew: autoRenew,
+                    rollover_leftover: rolloverLeftover,
+                });
                 setInput('');
                 onClose();
                 Alert.alert('Success', isIncome ? 'Income set successfully!' : 'Budget set successfully!');
@@ -113,6 +128,13 @@ export default function SetBudgetSheet({ isVisible, onClose }: SetBudgetSheetPro
     const handleDeductionChoice = (deductExpenses: boolean) => {
         if (pendingBudget) {
             setBudgetData(pendingBudget.amount, pendingBudget.days, 'replace', deductExpenses, autoRenew, rolloverLeftover);
+            posthog?.capture('budget_configured', {
+                dashboard_mode: dashboardMode,
+                update_type: 'replace',
+                deduct_existing_expenses: deductExpenses,
+                auto_renew: autoRenew,
+                rollover_leftover: rolloverLeftover,
+            });
             setInput('');
             setPendingBudget(null);
             setShowDeductionChoice(false);

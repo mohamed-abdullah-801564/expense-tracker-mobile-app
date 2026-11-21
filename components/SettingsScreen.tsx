@@ -49,6 +49,7 @@ import HowItWorksScreen from '@/components/HowItWorksScreen';
 import CurrencyPicker from './CurrencyPicker';
 import { parseBankStatementCsv, ParsedBankTransaction } from '@/utils/bank-statement-parser';
 import CsvImportModal from '@/components/CsvImportModal';
+import { posthog, posthogLogger } from '@/utils/posthog';
 
 const categories: ExpenseCategory[] = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Other'];
 
@@ -262,6 +263,15 @@ export default function SettingsScreen() {
 
             addExpense(expensesToAdd);
             await recordCsvImport();
+            posthog?.capture('csv_import_completed', {
+                imported_item_count: itemsToImport.length,
+                selected_item_count: selectedItems.length,
+                skipped_duplicate_count: selectedItems.length - itemsToImport.length,
+            });
+            posthogLogger?.info('csv_import_persisted', {
+                imported_item_count: itemsToImport.length,
+                skipped_duplicate_count: selectedItems.length - itemsToImport.length,
+            });
             setShowCsvModal(false);
 
             Alert.alert(

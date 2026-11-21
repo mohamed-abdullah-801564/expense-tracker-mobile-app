@@ -8,6 +8,7 @@ import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { currencies } from '@/constants/currencies';
 import { getFallbackRate } from '@/utils/expense-parser';
+import { posthog } from '@/utils/posthog';
 
 interface ExpenseCardProps {
     expense: Expense;
@@ -95,6 +96,11 @@ export function ExpenseCard({ expense }: ExpenseCardProps) {
                     style: 'destructive',
                     onPress: () => {
                         deleteExpense(expense.id);
+                        posthog?.capture('expense_deleted', {
+                            category: expense.category,
+                            source: expense.source || 'manual',
+                            is_remittance: Boolean(expense.isRemittance),
+                        });
                         const linkedSplits = splitExpenses.filter(s => s.expenseId === expense.id);
                         linkedSplits.forEach(s => deleteSplitExpense(s.id));
                     }
