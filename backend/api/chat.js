@@ -1,4 +1,30 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { PostHog } from "posthog-node";
+import { randomUUID } from "node:crypto";
+
+const posthogProjectToken = process.env.POSTHOG_API_KEY;
+const posthogHost = process.env.POSTHOG_HOST;
+
+if (process.env.NODE_ENV !== 'production') {
+  if (!posthogProjectToken) {
+    console.warn('POSTHOG_API_KEY variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once POSTHOG_API_KEY is configured');
+  }
+  if (!posthogHost) {
+    console.warn('POSTHOG_HOST variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once POSTHOG_HOST is configured');
+  }
+}
+
+const posthog = posthogProjectToken && posthogHost
+  ? new PostHog(posthogProjectToken, {
+      host: posthogHost,
+      privacyMode: false,
+      flushAt: 1,
+      flushInterval: 0,
+      requestTimeout: 2000,
+      fetchRetryCount: 0,
+    })
+  : null;
+const processAiSessionId = `serverless-${process.pid}-${randomUUID()}`;
 
 export const config = {
   api: {
@@ -12,6 +38,57 @@ export const config = {
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 30;
+
+async function captureGeminiGeneration({
+  traceId,
+  distinctId,
+  model,
+  contents,
+  systemInstruction,
+  response,
+  output,
+  latency,
+  error,
+}) {
+  if (!posthog) return;
+
+  const usage = response?.usageMetadata;
+  const properties = {
+    $ai_trace_id: traceId,
+    $ai_session_id: processAiSessionId,
+    $ai_span_id: randomUUID(),
+    $ai_span_name: 'gemini_generate_content',
+    $ai_model: model,
+    $ai_provider: 'gemini',
+    $ai_input: [
+      { role: 'system', content: systemInstruction },
+      { role: 'user', content: contents },
+    ],
+    $ai_output_choices: output
+      ? [{ role: 'assistant', content: output }]
+      : [],
+    $ai_latency: latency,
+    ...(usage?.promptTokenCount !== undefined && {
+      $ai_input_tokens: usage.promptTokenCount,
+    }),
+    ...(usage?.candidatesTokenCount !== undefined && {
+      $ai_output_tokens: usage.candidatesTokenCount,
+    }),
+    ...(response?.candidates?.[0]?.finishReason && {
+      $ai_stop_reason: response.candidates[0].finishReason,
+    }),
+    ...(error && {
+      $ai_is_error: true,
+      $ai_error: error?.message || String(error),
+    }),
+  };
+
+  await posthog.captureAiImmediate({
+    ...(distinctId ? { distinctId } : {}),
+    event: '$ai_generation',
+    properties,
+  }).catch(() => {});
+}
 
 function isRateLimited(ip) {
   const now = Date.now();
@@ -76,7 +153,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt, image, mimeType, systemInstruction } = req.body;
+    const { prompt, image, mimeType, systemInstruction, posthogDistinctId } = req.body;
 
     if (!prompt || typeof prompt !== 'string') {
       setCorsHeaders(res);
@@ -124,11 +201,18 @@ export default async function handler(req, res) {
       'gemini-2.0-flash',
       'gemini-2.0-flash-lite'
     ].filter(Boolean).filter((m, i, self) => self.indexOf(m) === i);
+    const traceId = randomUUID();
+    const distinctId = typeof posthogDistinctId === 'string' && posthogDistinctId.length <= 200
+      ? posthogDistinctId
+      : undefined;
 
     let result = null;
     let lastError = null;
+    let selectedModel = null;
+    let selectedGenerationStartedAt = null;
 
     for (const modelName of fallbackModels) {
+      const generationStartedAt = Date.now();
       try {
         console.log(`[Backend Proxy] Attempting Gemini API with model: ${modelName}`);
         const modelInstance = genAI.getGenerativeModel({
@@ -136,8 +220,19 @@ export default async function handler(req, res) {
           systemInstruction: systemInstructionText
         });
         result = await modelInstance.generateContent(contents);
+        selectedModel = modelName;
+        selectedGenerationStartedAt = generationStartedAt;
         if (result) break;
       } catch (geminiError) {
+        await captureGeminiGeneration({
+          traceId,
+          distinctId,
+          model: modelName,
+          contents,
+          systemInstruction: systemInstructionText,
+          latency: (Date.now() - generationStartedAt) / 1000,
+          error: geminiError,
+        });
         console.warn(`[Backend Proxy] Model ${modelName} failed:`, geminiError?.message || geminiError);
         lastError = geminiError;
       }
@@ -172,6 +267,19 @@ export default async function handler(req, res) {
     if (!text) {
       text = 'Unable to generate response.';
     }
+
+    await captureGeminiGeneration({
+      traceId,
+      distinctId,
+      model: selectedModel,
+      contents,
+      systemInstruction: systemInstructionText,
+      response,
+      output: text,
+      latency: selectedGenerationStartedAt
+        ? (Date.now() - selectedGenerationStartedAt) / 1000
+        : undefined,
+    });
 
     setCorsHeaders(res);
     return res.status(200).json({ text });

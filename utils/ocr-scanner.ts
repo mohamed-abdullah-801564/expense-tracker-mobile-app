@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { posthog } from './posthog';
 
 const LAST_SCAN_DATE_KEY = 'lastScanDate';
 const DAILY_SCAN_COUNT_KEY = 'dailyScanCount';
@@ -87,6 +88,13 @@ Format:
   ]
 }`;
 
+    let posthogDistinctId: string | undefined;
+    try {
+        posthogDistinctId = posthog ? await posthog.getDistinctId() : undefined;
+    } catch {
+        // Analytics identity must not affect receipt scanning.
+    }
+
     const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
@@ -97,7 +105,8 @@ Format:
             prompt: systemPrompt,
             image: base64Image,
             mimeType: 'image/jpeg',
-            systemInstruction: systemPrompt
+            systemInstruction: systemPrompt,
+            ...(posthogDistinctId ? { posthogDistinctId } : {}),
         })
     });
 

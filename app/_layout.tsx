@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
 import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PostHogErrorBoundary, PostHogProvider } from 'posthog-react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemeProvider as AppThemeProvider, useTheme } from '@/hooks/theme-store';
@@ -15,7 +16,7 @@ import { SubscriptionProvider, useSubscription } from '@/hooks/subscription-stor
 import { useNotifications } from '@/hooks/notification-store';
 import { View, ActivityIndicator, Animated, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, type ReactNode } from 'react';
 import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
 import FeedbackModal from '@/components/FeedbackModal';
 import PaywallModal from '@/components/PaywallModal';
@@ -23,6 +24,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HowItWorksScreen from '@/components/HowItWorksScreen';
 import CurrencyPicker from '@/components/CurrencyPicker';
+import { posthog, posthogLogger } from '@/utils/posthog';
 
 function GlobalModals() {
   const { isFeedbackModalVisible, setFeedbackModalVisible } = useExpenses();
@@ -181,6 +183,28 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might cause this to error */
 });
 
+function ErrorFallback() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <Text>Something went wrong. Please restart the app.</Text>
+    </View>
+  );
+}
+
+function AnalyticsProvider({ children }: { children: ReactNode }) {
+  if (!posthog) {
+    return <>{children}</>;
+  }
+
+  return (
+    <PostHogProvider client={posthog}>
+      <PostHogErrorBoundary fallback={ErrorFallback}>
+        {children}
+      </PostHogErrorBoundary>
+    </PostHogProvider>
+  );
+}
+
 function ThemedNavigationContainer() {
   const { isDarkMode } = useTheme();
   return (
@@ -220,6 +244,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (appIsReady) {
       SplashScreen.hideAsync();
+      posthogLogger?.info('expense_tracker_ready', {
+        startup_path: 'root_layout',
+      });
     }
   }, [appIsReady]);
 
@@ -229,9 +256,11 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppThemeProvider>
-        <ThemedNavigationContainer />
-      </AppThemeProvider>
+      <AnalyticsProvider>
+        <AppThemeProvider>
+          <ThemedNavigationContainer />
+        </AppThemeProvider>
+      </AnalyticsProvider>
     </QueryClientProvider>
   );
 }

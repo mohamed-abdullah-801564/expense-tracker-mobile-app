@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Star, X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme-store';
+import { posthog } from '@/utils/posthog';
 
 interface FeedbackModalProps {
     visible: boolean;
@@ -43,6 +44,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
             const PROXY_URL = process.env.EXPO_PUBLIC_PROXY_URL_FEEDBACK;
             
             let success = false;
+            let deliveryChannel: 'proxy' | 'email_client' | null = null;
             if (PROXY_URL) {
                 try {
                     const response = await fetch(PROXY_URL, {
@@ -50,7 +52,10 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(feedbackData)
                     });
-                    if (response.ok) success = true;
+                    if (response.ok) {
+                        success = true;
+                        deliveryChannel = 'proxy';
+                    }
                 } catch (e) {
                     console.error('Backend submission failed:', e);
                 }
@@ -65,6 +70,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
                 
                 if (await Linking.canOpenURL(mailtoUrl)) {
                     await Linking.openURL(mailtoUrl);
+                    deliveryChannel = 'email_client';
                 } else {
                     Alert.alert('Success', 'Thank you for your feedback! (Email client not found)');
                 }
@@ -72,6 +78,12 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
                 Alert.alert('Success', 'Thank you for your feedback! It has been recorded.');
             }
 
+            if (deliveryChannel) {
+                posthog?.capture('feedback_submitted', {
+                    rating,
+                    delivery_channel: deliveryChannel,
+                });
+            }
             setRating(0);
             setSuggestion('');
             onClose();

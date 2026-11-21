@@ -27,6 +27,7 @@ import {
 import { useTheme } from '@/hooks/theme-store';
 import { useSubscription, PaywallReason } from '@/hooks/subscription-store';
 import { CelebrationRain } from '@/components/ui/celebration-rain';
+import { posthog } from '@/utils/posthog';
 
 interface PaywallModalProps {
     visible: boolean;
@@ -102,6 +103,10 @@ export default function PaywallModal({ visible, onClose, reason = 'general' }: P
         try {
             const success = await upgradeToPro(plan);
             if (success) {
+                posthog?.capture('subscription_started', {
+                    plan,
+                    paywall_reason: reason,
+                });
                 // Trigger gift rain celebration upon upgrade!
                 setShowCelebration(true);
                 setTimeout(() => {
@@ -122,6 +127,9 @@ export default function PaywallModal({ visible, onClose, reason = 'general' }: P
     const handleStartTrial = async () => {
         try {
             await startTrial();
+            posthog?.capture('trial_started', {
+                paywall_reason: reason,
+            });
             setShowCelebration(true);
             setTimeout(() => {
                 Alert.alert(

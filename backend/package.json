@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "posthog-node": "^6.0.5",
     "resend": "^3.5.0"
   }
 }

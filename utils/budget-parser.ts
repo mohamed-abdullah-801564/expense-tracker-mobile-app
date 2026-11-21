@@ -1,5 +1,6 @@
 import { ParsedBudget } from '@/types/expense';
 import { validateAmount } from './expense-parser';
+import { posthog } from './posthog';
 
 export async function parseBudgetWithAI(input: string, currencySymbol: string = '₹'): Promise<ParsedBudget> {
     const controller = new AbortController();
@@ -42,6 +43,12 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
         }
 
         const appSecret = process.env.EXPO_PUBLIC_APP_SECRET;
+        let posthogDistinctId: string | undefined;
+        try {
+            posthogDistinctId = posthog ? await posthog.getDistinctId() : undefined;
+        } catch {
+            // Analytics identity must not affect budget parsing.
+        }
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
@@ -50,7 +57,8 @@ Output: { "budget_amount": 500, "budget_days": null, "is_add_operation": true }`
             },
             body: JSON.stringify({
                 prompt: input,
-                systemInstruction: systemPrompt
+                systemInstruction: systemPrompt,
+                ...(posthogDistinctId ? { posthogDistinctId } : {}),
             }),
             signal: controller.signal
         });

@@ -19,6 +19,7 @@ import { useExpenses } from '@/hooks/expense-store';
 import { useSplitExpenses } from '@/hooks/split-expense-store';
 import { useTheme } from '@/hooks/theme-store';
 import { askGeminiAssistant } from '@/utils/ai-chat';
+import { posthog } from '@/utils/posthog';
 
 type ChatMessage = {
     role: 'user' | 'ai';
@@ -75,6 +76,7 @@ export function FloatingAIAssistant() {
             
             const aiMessage: ChatMessage = { role: 'ai', text: finalResponse };
             setMessages((prev) => [...prev, aiMessage]);
+            posthog?.capture('ai_assistant_response_received');
         } finally {
             setIsLoading(false);
         }

@@ -1,5 +1,6 @@
 import { ParsedExpense } from '@/types/expense';
 import { CATEGORIES } from '@/constants/categories';
+import { posthog } from './posthog';
 
 export const MAX_AMOUNT = 1000000;
 export const MIN_AMOUNT = 0.01;
@@ -95,6 +96,12 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
         }
 
         const appSecret = process.env.EXPO_PUBLIC_APP_SECRET;
+        let posthogDistinctId: string | undefined;
+        try {
+            posthogDistinctId = posthog ? await posthog.getDistinctId() : undefined;
+        } catch {
+            // Analytics identity must not affect expense parsing.
+        }
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
@@ -103,7 +110,8 @@ Output: { "amount": 500, "description": "Sent money to family", "category": "Rem
             },
             body: JSON.stringify({
                 prompt: input,
-                systemInstruction: systemPrompt
+                systemInstruction: systemPrompt,
+                ...(posthogDistinctId ? { posthogDistinctId } : {}),
             }),
             signal: controller.signal
         });

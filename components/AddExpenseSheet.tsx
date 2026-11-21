@@ -24,6 +24,7 @@ import { SplitExpense } from '@/types/expense';
 import { currencies } from '@/constants/currencies';
 import { checkDailyScanLimit, incrementDailyScanCount, scanReceiptWithGemini } from '@/utils/ocr-scanner';
 import { CATEGORIES, CATEGORY_COLORS } from '@/constants/categories';
+import { posthog } from '@/utils/posthog';
 
 interface AddExpenseSheetProps {
     visible: boolean;
@@ -95,6 +96,9 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     price: item.price.toString(),
                     category: item.category === 'Others' ? 'Other' : item.category
                 }))
+            });
+            posthog?.capture('receipt_scan_completed', {
+                item_count: result.items.length,
             });
 
         } catch (error: any) {
@@ -278,6 +282,11 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     };
                 });
                 addExpense(itemsToBatch);
+                posthog?.capture('expense_added', {
+                    entry_method: 'receipt_scan',
+                    item_count: itemsToBatch.length,
+                    includes_remittance: hasRemittance,
+                });
 
                 setScannedData(null);
                 setInput('');
@@ -316,6 +325,9 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
             };
 
             addSplitExpenses([newSplit]);
+            posthog?.capture('debt_recorded', {
+                debt_type: debtData.type,
+            });
 
             if (debtData.type === 'lend') {
                 // Lending is NOT added to expenses, only Friends tab
@@ -400,6 +412,11 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     };
                 });
                 addExpense(itemsToBatch);
+                posthog?.capture('expense_added', {
+                    entry_method: 'natural_language',
+                    item_count: itemsToBatch.length,
+                    includes_remittance: hasRemittance,
+                });
             } else {
                 // Existing single expense path
                 let splitData: ParsedSplitWithNames | null = null;
@@ -478,6 +495,13 @@ export function AddExpenseSheet({ visible, onClose }: AddExpenseSheetProps) {
                     historicalPrimarySymbol,
                     historicalHomeSymbol,
                     historicalConvertedAmount,
+                });
+                posthog?.capture('expense_added', {
+                    entry_method: 'natural_language',
+                    item_count: 1,
+                    category: parsed.category || 'Other',
+                    is_split_expense: Boolean(splitData),
+                    is_remittance: Boolean(parsed.isRemittance),
                 });
 
                 if (splitData) {

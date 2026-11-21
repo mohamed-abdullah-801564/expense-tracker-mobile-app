@@ -3,6 +3,7 @@ import { Platform, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseUpiNotification, ParsedUpiNotification } from '@/utils/upi-notification-parser';
 import { useExpenses } from '@/hooks/expense-store';
+import { posthog } from '@/utils/posthog';
 
 const AUTO_TRACKING_ENABLED_KEY = 'auto_tracking_enabled';
 const RECENT_TRACKED_CACHE_KEY = 'recent_tracked_notifications';
@@ -119,6 +120,9 @@ export function useAutoTracking() {
                     category: parsed.category,
                     date: today,
                     source: 'auto_upi',
+                });
+                posthog?.capture('auto_tracked_expense_recorded', {
+                    category: parsed.category,
                 });
 
                 return { success: true, parsed };
